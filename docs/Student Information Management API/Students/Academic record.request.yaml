@@ -1,0 +1,6 @@
+$kind: http-request
+url: "{{baseUrl}}/students/{{studentId}}/academic-record"
+method: GET
+headers:
+  Authorization: Bearer {{token}}
+order: 4000

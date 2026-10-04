@@ -1,0 +1,215 @@
+openapi: 3.0.3
+info:
+  title: Student Information Management API
+  version: 1.0.0
+  description: Versioned REST API for student and academic record management.
+servers:
+  - url: http://127.0.0.1:8000/api/v1
+security:
+  - bearerAuth: []
+tags:
+  - name: Authentication
+  - name: Core Resources
+  - name: Academic Transactions
+paths:
+  /health:
+    get:
+      security: []
+      tags: [Authentication]
+      summary: Check API health
+      responses:
+        '200': { description: API is running }
+  /auth/login:
+    post:
+      security: []
+      tags: [Authentication]
+      summary: Authenticate a user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200': { description: Authenticated successfully }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /auth/me:
+    get:
+      tags: [Authentication]
+      summary: Get the current user
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /auth/logout:
+    post:
+      tags: [Authentication]
+      summary: Revoke the current token
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /programs:
+    get:
+      tags: [Core Resources]
+      summary: List programs with search, sorting, and pagination
+      parameters: [{ $ref: '#/components/parameters/Search' }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/PerPage' }, { $ref: '#/components/parameters/Sort' }]
+      responses: { '200': { $ref: '#/components/responses/PaginatedSuccess' } }
+    post:
+      tags: [Core Resources]
+      summary: Create a program
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ProgramRequest' } } } }
+      responses: { '201': { $ref: '#/components/responses/Created' }, '422': { $ref: '#/components/responses/ValidationError' } }
+  /programs/{id}:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    get: { tags: [Core Resources], summary: Retrieve a program, responses: { '200': { $ref: '#/components/responses/Success' }, '404': { $ref: '#/components/responses/NotFound' } } }
+    put: { tags: [Core Resources], summary: Update a program, requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ProgramUpdate' } } } }, responses: { '200': { $ref: '#/components/responses/Success' }, '422': { $ref: '#/components/responses/ValidationError' } } }
+    patch: { tags: [Core Resources], summary: Partially update a program, requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ProgramUpdate' } } } }, responses: { '200': { $ref: '#/components/responses/Success' }, '422': { $ref: '#/components/responses/ValidationError' } } }
+    delete: { tags: [Core Resources], summary: Deactivate a program, responses: { '200': { $ref: '#/components/responses/Success' } } }
+  /students:
+    get:
+      tags: [Core Resources]
+      summary: List students with search, filtering, sorting, and pagination
+      parameters: [{ $ref: '#/components/parameters/Search' }, { name: program_id, in: query, schema: { type: integer } }, { name: year_level, in: query, schema: { type: integer } }, { name: status, in: query, schema: { type: string } }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/PerPage' }, { $ref: '#/components/parameters/Sort' }]
+      responses: { '200': { $ref: '#/components/responses/PaginatedSuccess' } }
+    post:
+      tags: [Core Resources]
+      summary: Create a student
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/StudentRequest' } } } }
+      responses: { '201': { $ref: '#/components/responses/Created' }, '422': { $ref: '#/components/responses/ValidationError' } }
+  /students/{id}:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    get: { tags: [Core Resources], summary: Retrieve a student, responses: { '200': { $ref: '#/components/responses/Success' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } } }
+    put: { tags: [Core Resources], summary: Update a student, requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/StudentUpdate' } } } }, responses: { '200': { $ref: '#/components/responses/Success' }, '422': { $ref: '#/components/responses/ValidationError' } } }
+    patch: { tags: [Core Resources], summary: Partially update a student, requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/StudentUpdate' } } } }, responses: { '200': { $ref: '#/components/responses/Success' }, '422': { $ref: '#/components/responses/ValidationError' } } }
+    delete: { tags: [Core Resources], summary: Deactivate a student, responses: { '200': { $ref: '#/components/responses/Success' } } }
+  /courses:
+    get: { tags: [Core Resources], summary: List courses, responses: { '200': { $ref: '#/components/responses/PaginatedSuccess' } } }
+    post: { tags: [Core Resources], summary: Create a course, requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CourseRequest' } } } }, responses: { '201': { $ref: '#/components/responses/Created' }, '422': { $ref: '#/components/responses/ValidationError' } } }
+  /academic-terms:
+    get: { tags: [Core Resources], summary: List academic terms, responses: { '200': { $ref: '#/components/responses/PaginatedSuccess' } } }
+    post: { tags: [Core Resources], summary: Create an academic term, requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AcademicTermRequest' } } } }, responses: { '201': { $ref: '#/components/responses/Created' }, '422': { $ref: '#/components/responses/ValidationError' } } }
+  /course-offerings:
+    get: { tags: [Academic Transactions], summary: List course offerings, responses: { '200': { $ref: '#/components/responses/PaginatedSuccess' } } }
+    post: { tags: [Academic Transactions], summary: Create a course offering, requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CourseOfferingRequest' } } } }, responses: { '201': { $ref: '#/components/responses/Created' }, '422': { $ref: '#/components/responses/ValidationError' } } }
+  /enrollments:
+    get: { tags: [Academic Transactions], summary: List enrollments, responses: { '200': { $ref: '#/components/responses/PaginatedSuccess' } } }
+    post: { tags: [Academic Transactions], summary: Enroll a student, requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/EnrollmentRequest' } } } }, responses: { '201': { $ref: '#/components/responses/Created' }, '409': { description: Duplicate or unavailable enrollment }, '422': { $ref: '#/components/responses/ValidationError' } } }
+  /grades:
+    get: { tags: [Academic Transactions], summary: List grades, responses: { '200': { $ref: '#/components/responses/PaginatedSuccess' } } }
+    post: { tags: [Academic Transactions], summary: Record a grade, requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/GradeRequest' } } } }, responses: { '201': { $ref: '#/components/responses/Created' }, '403': { $ref: '#/components/responses/Forbidden' }, '422': { $ref: '#/components/responses/ValidationError' } } }
+  /students/{id}/academic-record:
+    get:
+      tags: [Academic Transactions]
+      summary: Retrieve a student academic record grouped by term
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses: { '200': { $ref: '#/components/responses/Success' }, '403': { $ref: '#/components/responses/Forbidden' } }
+  /courses/{id}:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    get: { tags: [Core Resources], summary: Retrieve a course, responses: { '200': { $ref: '#/components/responses/Success' }, '404': { $ref: '#/components/responses/NotFound' } } }
+    put: { tags: [Core Resources], summary: Update a course, requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CourseUpdate' } } } }, responses: { '200': { $ref: '#/components/responses/Success' }, '422': { $ref: '#/components/responses/ValidationError' } } }
+    patch: { tags: [Core Resources], summary: Partially update a course, requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CourseUpdate' } } } }, responses: { '200': { $ref: '#/components/responses/Success' }, '422': { $ref: '#/components/responses/ValidationError' } } }
+    delete: { tags: [Core Resources], summary: Deactivate a course, responses: { '200': { $ref: '#/components/responses/Success' } } }
+  /academic-terms/{id}:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    get: { tags: [Core Resources], summary: Retrieve an academic term, responses: { '200': { $ref: '#/components/responses/Success' }, '404': { $ref: '#/components/responses/NotFound' } } }
+    put: { tags: [Core Resources], summary: Update an academic term, requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AcademicTermUpdate' } } } }, responses: { '200': { $ref: '#/components/responses/Success' }, '422': { $ref: '#/components/responses/ValidationError' } } }
+    patch: { tags: [Core Resources], summary: Partially update an academic term, requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AcademicTermUpdate' } } } }, responses: { '200': { $ref: '#/components/responses/Success' }, '422': { $ref: '#/components/responses/ValidationError' } } }
+    delete: { tags: [Core Resources], summary: Deactivate an academic term, responses: { '200': { $ref: '#/components/responses/Success' } } }
+  /course-offerings/{id}:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    get: { tags: [Academic Transactions], summary: Retrieve an offering (instructors may access assigned offerings), responses: { '200': { $ref: '#/components/responses/Success' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } } }
+    put: { tags: [Academic Transactions], summary: Update an offering, requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CourseOfferingUpdate' } } } }, responses: { '200': { $ref: '#/components/responses/Success' }, '422': { $ref: '#/components/responses/ValidationError' } } }
+    patch: { tags: [Academic Transactions], summary: Partially update an offering, requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CourseOfferingUpdate' } } } }, responses: { '200': { $ref: '#/components/responses/Success' }, '422': { $ref: '#/components/responses/ValidationError' } } }
+    delete: { tags: [Academic Transactions], summary: Cancel an offering, responses: { '200': { $ref: '#/components/responses/Success' } } }
+  /course-offerings/{id}/students:
+    get: { tags: [Academic Transactions], summary: List students enrolled in an offering, parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/PerPage' }, { $ref: '#/components/parameters/Sort' }], responses: { '200': { $ref: '#/components/responses/PaginatedSuccess' }, '403': { $ref: '#/components/responses/Forbidden' } } }
+  /enrollments/{id}:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    get: { tags: [Academic Transactions], summary: Retrieve an enrollment subject to role scope, responses: { '200': { $ref: '#/components/responses/Success' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } } }
+    patch: { tags: [Academic Transactions], summary: Change enrollment status, requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/EnrollmentUpdate' } } } }, responses: { '200': { $ref: '#/components/responses/Success' }, '422': { $ref: '#/components/responses/ValidationError' } } }
+    delete: { tags: [Academic Transactions], summary: Drop an enrollment, responses: { '200': { $ref: '#/components/responses/Success' } } }
+  /students/{id}/enrollments:
+    get: { tags: [Academic Transactions], summary: List a student's enrollments, parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/PerPage' }], responses: { '200': { $ref: '#/components/responses/Success' }, '403': { $ref: '#/components/responses/Forbidden' } } }
+  /grades/{id}:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    get: { tags: [Academic Transactions], summary: Retrieve a grade subject to role scope, responses: { '200': { $ref: '#/components/responses/Success' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } } }
+    put: { tags: [Academic Transactions], summary: Update a grade for an authorized enrollment, requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/GradeUpdate' } } } }, responses: { '200': { $ref: '#/components/responses/Success' }, '403': { $ref: '#/components/responses/Forbidden' }, '422': { $ref: '#/components/responses/ValidationError' } } }
+    patch: { tags: [Academic Transactions], summary: Partially update a grade for an authorized enrollment, requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/GradeUpdate' } } } }, responses: { '200': { $ref: '#/components/responses/Success' }, '403': { $ref: '#/components/responses/Forbidden' }, '422': { $ref: '#/components/responses/ValidationError' } } }
+  /students/{id}/grades:
+    get: { tags: [Academic Transactions], summary: List a student's grades, parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/PerPage' }], responses: { '200': { $ref: '#/components/responses/Success' }, '403': { $ref: '#/components/responses/Forbidden' } } }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: SanctumToken }
+  parameters:
+    Id: { name: id, in: path, required: true, schema: { type: integer } }
+    Search: { name: search, in: query, schema: { type: string } }
+    Page: { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+    PerPage: { name: per_page, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+    Sort: { name: sort, in: query, schema: { type: string, example: last_name } }
+  schemas:
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties: { email: { type: string, format: email }, password: { type: string, format: password } }
+    ProgramRequest:
+      type: object
+      required: [code, name]
+      properties: { code: { type: string, maxLength: 30 }, name: { type: string }, description: { type: string, nullable: true }, status: { type: string, enum: [active, inactive] } }
+    StudentRequest:
+      type: object
+      required: [student_number, first_name, last_name, program_id, year_level]
+      properties: { student_number: { type: string }, first_name: { type: string }, middle_name: { type: string, nullable: true }, last_name: { type: string }, email: { type: string, format: email, nullable: true }, program_id: { type: integer }, year_level: { type: integer, minimum: 1, maximum: 8 }, status: { type: string, enum: [active, inactive, graduated] } }
+    CourseRequest:
+      type: object
+      required: [course_code, course_title, units]
+      properties: { course_code: { type: string }, course_title: { type: string }, units: { type: integer, minimum: 1, maximum: 12 }, description: { type: string, nullable: true } }
+    ProgramUpdate:
+      type: object
+      properties: { code: { type: string, maxLength: 30 }, name: { type: string }, description: { type: string, nullable: true }, status: { type: string, enum: [active, inactive] } }
+    StudentUpdate:
+      type: object
+      properties: { student_number: { type: string }, first_name: { type: string }, middle_name: { type: string, nullable: true }, last_name: { type: string }, email: { type: string, format: email, nullable: true }, program_id: { type: integer }, year_level: { type: integer, minimum: 1, maximum: 8 }, status: { type: string, enum: [active, inactive, graduated] } }
+    CourseUpdate:
+      type: object
+      properties: { course_code: { type: string }, course_title: { type: string }, units: { type: integer, minimum: 1, maximum: 12 }, description: { type: string, nullable: true }, status: { type: string, enum: [active, inactive] } }
+    AcademicTermRequest:
+      type: object
+      required: [academic_year, semester, start_date, end_date]
+      properties: { academic_year: { type: string }, semester: { type: string }, start_date: { type: string, format: date }, end_date: { type: string, format: date }, status: { type: string, enum: [active, inactive, closed] } }
+    AcademicTermUpdate:
+      type: object
+      properties: { academic_year: { type: string }, semester: { type: string }, start_date: { type: string, format: date }, end_date: { type: string, format: date }, status: { type: string, enum: [active, inactive, closed] } }
+    CourseOfferingRequest:
+      type: object
+      required: [course_id, academic_term_id, instructor_id, section, capacity]
+      properties: { course_id: { type: integer }, academic_term_id: { type: integer }, instructor_id: { type: integer }, section: { type: string }, schedule: { type: string, nullable: true }, room: { type: string, nullable: true }, capacity: { type: integer, minimum: 1, maximum: 500 }, status: { type: string, enum: [open, closed, cancelled] } }
+    CourseOfferingUpdate:
+      type: object
+      properties: { course_id: { type: integer }, academic_term_id: { type: integer }, instructor_id: { type: integer }, section: { type: string }, schedule: { type: string, nullable: true }, room: { type: string, nullable: true }, capacity: { type: integer, minimum: 1, maximum: 500 }, status: { type: string, enum: [open, closed, cancelled] } }
+    EnrollmentRequest:
+      type: object
+      required: [student_id, course_offering_id]
+      properties: { student_id: { type: integer }, course_offering_id: { type: integer }, enrollment_date: { type: string, format: date }, status: { type: string, enum: [enrolled, dropped, completed] } }
+    EnrollmentUpdate:
+      type: object
+      required: [status]
+      properties: { status: { type: string, enum: [enrolled, dropped, completed] } }
+    GradeRequest:
+      type: object
+      required: [enrollment_id]
+      properties: { enrollment_id: { type: integer }, midterm_grade: { type: number, minimum: 0, maximum: 100, nullable: true }, final_grade: { type: number, minimum: 0, maximum: 100, nullable: true }, remarks: { type: string, nullable: true } }
+    GradeUpdate:
+      type: object
+      properties: { midterm_grade: { type: number, minimum: 0, maximum: 100, nullable: true }, final_grade: { type: number, minimum: 0, maximum: 100, nullable: true }, remarks: { type: string, nullable: true } }
+    ApiResponse:
+      type: object
+      properties: { success: { type: boolean }, message: { type: string }, data: {}, errors: { type: object, additionalProperties: { type: array, items: { type: string } } }, meta: { $ref: '#/components/schemas/PaginationMeta' } }
+    PaginationMeta:
+      type: object
+      properties: { current_page: { type: integer }, per_page: { type: integer }, total: { type: integer }, last_page: { type: integer } }
+  responses:
+    Success: { description: Successful response, content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponse' } } } }
+    Created: { description: Resource created, content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponse' } } } }
+    PaginatedSuccess: { description: Paginated response with metadata, content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponse' } } } }
+    ValidationError: { description: Validation failed, content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponse' } } } }
+    Unauthorized: { description: Authentication required }
+    Forbidden: { description: Insufficient permission }
+    NotFound: { description: Resource not found }

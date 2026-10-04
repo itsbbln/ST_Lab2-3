@@ -1,0 +1,12 @@
+$kind: collection
+description: Acceptance demonstration collection for the Laravel REST API.
+variables:
+  baseUrl: http://127.0.0.1:8000/api/v1
+  token: ""
+  programId: "1"
+  studentId: "1"
+  courseId: "1"
+  termId: "1"
+  offeringId: "1"
+  enrollmentId: "1"
+  gradeId: "1"

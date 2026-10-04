@@ -1,0 +1,18 @@
+$kind: http-request
+url: "{{baseUrl}}/students"
+method: POST
+headers:
+  Authorization: Bearer {{token}}
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "student_number": "2026-99999",
+      "first_name": "Demo",
+      "last_name": "Student",
+      "program_id": {{programId}},
+      "year_level": 1,
+      "email": "demo.student@example.com"
+    }
+order: 3000

@@ -1,0 +1,102 @@
+{
+  "info": {
+    "name": "Student Information Management API v1",
+    "description": "Laboratory demonstration requests. Log in as admin first to populate the token variable. Requests use the seeded database and the IDs returned by create requests where possible.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://127.0.0.1:8000/api/v1" },
+    { "key": "token", "value": "" },
+    { "key": "programId", "value": "1" },
+    { "key": "studentId", "value": "1" },
+    { "key": "courseId", "value": "1" },
+    { "key": "termId", "value": "1" },
+    { "key": "instructorId", "value": "3" },
+    { "key": "offeringId", "value": "1" },
+    { "key": "enrollmentId", "value": "1" },
+    { "key": "gradeId", "value": "1" }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login as administrator",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["if (pm.response.code === 200) pm.collectionVariables.set('token', pm.response.json().data.token);"] } }],
+          "request": { "auth": { "type": "noauth" }, "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"password\"\n}" }, "url": "{{baseUrl}}/auth/login" }
+        },
+        { "name": "Current authenticated user", "request": { "method": "GET", "url": "{{baseUrl}}/auth/me" } },
+        { "name": "Invalid password returns 401", "request": { "auth": { "type": "noauth" }, "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"wrong-password\"\n}" }, "url": "{{baseUrl}}/auth/login" } },
+        { "name": "Logout and revoke current token", "request": { "method": "POST", "url": "{{baseUrl}}/auth/logout" } }
+      ]
+    },
+    {
+      "name": "Students",
+      "item": [
+        { "name": "Search, filter, sort, paginate students", "request": { "method": "GET", "url": "{{baseUrl}}/students?search=demo&status=active&sort=-last_name&page=1&per_page=10" } },
+        { "name": "Create student", "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["if (pm.response.code === 201) pm.collectionVariables.set('studentId', pm.response.json().data.id);"] } }], "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"student_number\": \"DEMO-90001\",\n  \"first_name\": \"Ada\",\n  \"last_name\": \"Lovelace\",\n  \"email\": \"ada.demo@example.test\",\n  \"program_id\": {{programId}},\n  \"year_level\": 1\n}" }, "url": "{{baseUrl}}/students" } },
+        { "name": "Duplicate student number returns 422", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"student_number\": \"DEMO-90001\",\n  \"first_name\": \"Duplicate\",\n  \"last_name\": \"Student\",\n  \"program_id\": {{programId}},\n  \"year_level\": 1\n}" }, "url": "{{baseUrl}}/students" } },
+        { "name": "Retrieve student", "request": { "method": "GET", "url": "{{baseUrl}}/students/{{studentId}}" } },
+        { "name": "Partially update student", "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"year_level\": 2\n}" }, "url": "{{baseUrl}}/students/{{studentId}}" } }
+      ]
+    },
+    {
+      "name": "Programs",
+      "item": [
+        { "name": "List/search programs", "request": { "method": "GET", "url": "{{baseUrl}}/programs?search=BSIT&sort=name&per_page=10" } },
+        { "name": "Create program", "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["if (pm.response.code === 201) pm.collectionVariables.set('programId', pm.response.json().data.id);"] } }], "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"code\": \"LAB-TEST\",\n  \"name\": \"Laboratory Test Program\"\n}" }, "url": "{{baseUrl}}/programs" } }
+      ]
+    },
+    {
+      "name": "Courses",
+      "item": [
+        { "name": "Search/filter courses", "request": { "method": "GET", "url": "{{baseUrl}}/courses?search=information&status=active&sort=course_code&per_page=10" } },
+        { "name": "Create course", "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["if (pm.response.code === 201) pm.collectionVariables.set('courseId', pm.response.json().data.id);"] } }], "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"course_code\": \"LAB-101\",\n  \"course_title\": \"API Laboratory\",\n  \"units\": 3\n}" }, "url": "{{baseUrl}}/courses" } }
+      ]
+    },
+    {
+      "name": "Academic Terms",
+      "item": [
+        { "name": "List/filter terms", "request": { "method": "GET", "url": "{{baseUrl}}/academic-terms?academic_year=2026-2027&status=active&per_page=10" } },
+        { "name": "Create academic term", "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["if (pm.response.code === 201) pm.collectionVariables.set('termId', pm.response.json().data.id);"] } }], "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"academic_year\": \"2030-2031\",\n  \"semester\": \"1st Semester\",\n  \"start_date\": \"2030-08-01\",\n  \"end_date\": \"2030-12-20\"\n}" }, "url": "{{baseUrl}}/academic-terms" } }
+      ]
+    },
+    {
+      "name": "Course Offerings",
+      "item": [
+        { "name": "List offerings", "request": { "method": "GET", "url": "{{baseUrl}}/course-offerings?status=open&sort=section&per_page=10" } },
+        { "name": "Create course offering", "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["if (pm.response.code === 201) pm.collectionVariables.set('offeringId', pm.response.json().data.id);"] } }], "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"course_id\": {{courseId}},\n  \"academic_term_id\": {{termId}},\n  \"instructor_id\": {{instructorId}},\n  \"section\": \"LAB-A\",\n  \"schedule\": \"Tuesday 09:00-12:00\",\n  \"room\": \"Lab 1\",\n  \"capacity\": 30\n}" }, "url": "{{baseUrl}}/course-offerings" } },
+        { "name": "List offering students", "request": { "method": "GET", "url": "{{baseUrl}}/course-offerings/{{offeringId}}/students" } }
+      ]
+    },
+    {
+      "name": "Enrollments",
+      "item": [
+        { "name": "List enrollments", "request": { "method": "GET", "url": "{{baseUrl}}/enrollments?status=enrolled&per_page=10" } },
+        { "name": "Enroll student", "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["if (pm.response.code === 201) pm.collectionVariables.set('enrollmentId', pm.response.json().data.id);"] } }], "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"student_id\": {{studentId}},\n  \"course_offering_id\": {{offeringId}}\n}" }, "url": "{{baseUrl}}/enrollments" } },
+        { "name": "Duplicate enrollment returns 409", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"student_id\": {{studentId}},\n  \"course_offering_id\": {{offeringId}}\n}" }, "url": "{{baseUrl}}/enrollments" } }
+      ]
+    },
+    {
+      "name": "Grades",
+      "item": [
+        { "name": "List grades", "request": { "method": "GET", "url": "{{baseUrl}}/grades?per_page=10&sort=-created_at" } },
+        { "name": "Record valid grade", "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["if (pm.response.code === 201) pm.collectionVariables.set('gradeId', pm.response.json().data.id);"] } }], "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"enrollment_id\": {{enrollmentId}},\n  \"midterm_grade\": 88,\n  \"final_grade\": 91,\n  \"remarks\": \"Laboratory demo\"\n}" }, "url": "{{baseUrl}}/grades" } },
+        { "name": "Grade above range returns 422", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"enrollment_id\": {{enrollmentId}},\n  \"final_grade\": 101\n}" }, "url": "{{baseUrl}}/grades" } }
+      ]
+    },
+    {
+      "name": "Academic Records",
+      "item": [
+        { "name": "Student enrollment history", "request": { "method": "GET", "url": "{{baseUrl}}/students/{{studentId}}/enrollments" } },
+        { "name": "Student grades", "request": { "method": "GET", "url": "{{baseUrl}}/students/{{studentId}}/grades" } },
+        { "name": "Term-grouped academic record", "request": { "method": "GET", "url": "{{baseUrl}}/students/{{studentId}}/academic-record" } },
+        { "name": "Missing student returns 404", "request": { "method": "GET", "url": "{{baseUrl}}/students/999999" } }
+      ]
+    }
+  ]
+}
