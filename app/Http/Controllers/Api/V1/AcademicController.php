@@ -17,11 +17,14 @@ class AcademicController extends Controller
 {
     public function courses(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', Course::class);
+
         return $this->collection(Course::query(), $request, ['course_code', 'course_title', 'units'], ['course_code', 'course_title'], ['status']);
     }
 
     public function storeCourse(Request $request): JsonResponse
     {
+        $this->authorize('create', Course::class);
         $course = Course::create($request->validate([
             'course_code' => ['required', 'string', 'max:30', 'unique:courses,course_code'],
             'course_title' => ['required', 'string', 'max:255'],
@@ -35,11 +38,14 @@ class AcademicController extends Controller
 
     public function showCourse(Course $course): JsonResponse
     {
+        $this->authorize('view', $course);
+
         return $this->ok('Course retrieved successfully.', $course);
     }
 
     public function updateCourse(Request $request, Course $course): JsonResponse
     {
+        $this->authorize('update', $course);
         $course->update($request->validate([
             'course_code' => ['sometimes', 'string', 'max:30', Rule::unique('courses', 'course_code')->ignore($course)],
             'course_title' => ['sometimes', 'string', 'max:255'],
@@ -53,17 +59,21 @@ class AcademicController extends Controller
 
     public function deleteCourse(Course $course): JsonResponse
     {
+        $this->authorize('delete', $course);
         $course->update(['status' => 'inactive']);
         return $this->ok('Course deactivated successfully.');
     }
 
     public function terms(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', AcademicTerm::class);
+
         return $this->collection(AcademicTerm::query(), $request, ['academic_year', 'semester', 'status'], ['academic_year', 'semester'], ['academic_year', 'semester', 'status']);
     }
 
     public function storeTerm(Request $request): JsonResponse
     {
+        $this->authorize('create', AcademicTerm::class);
         $term = AcademicTerm::create($request->validate([
             'academic_year' => ['required', 'string', 'max:20'],
             'semester' => ['required', 'string', 'max:30'],
@@ -77,11 +87,14 @@ class AcademicController extends Controller
 
     public function showTerm(AcademicTerm $academicTerm): JsonResponse
     {
+        $this->authorize('view', $academicTerm);
+
         return $this->ok('Academic term retrieved successfully.', $academicTerm);
     }
 
     public function updateTerm(Request $request, AcademicTerm $academicTerm): JsonResponse
     {
+        $this->authorize('update', $academicTerm);
         $academicTerm->update($request->validate([
             'academic_year' => ['sometimes', 'string', 'max:20'],
             'semester' => ['sometimes', 'string', 'max:30'],
@@ -95,19 +108,25 @@ class AcademicController extends Controller
 
     public function deleteTerm(AcademicTerm $academicTerm): JsonResponse
     {
+        $this->authorize('delete', $academicTerm);
         $academicTerm->update(['status' => 'inactive']);
         return $this->ok('Academic term deactivated successfully.');
     }
 
     public function offerings(Request $request): JsonResponse
     {
-        $query = CourseOffering::with(['course', 'academicTerm', 'instructor']);
-        $role = $request->user()->role;
+        $this->authorize('viewAny', CourseOffering::class);
 
-        if ($role === 'instructor') {
-            $query->where('instructor_id', $request->user()->id);
+        $query = CourseOffering::with(['course', 'academicTerm', 'instructor']);
+        $user = $request->user();
+
+        if ($user->isInstructor()) {
+            $query->where('instructor_id', $user->id);
+        } elseif ($user->isStudent()) {
+            abort_unless($user->student_id !== null, 403, 'No student profile is linked to this account.');
+            $query->whereHas('enrollments', fn ($builder) => $builder->where('student_id', $user->student_id));
         } else {
-            abort_unless(in_array($role, ['administrator', 'registrar', 'staff'], true), 403, 'You are not authorized to list course offerings.');
+            abort_unless($user->isManagement(), 403, 'You are not authorized to list course offerings.');
         }
 
         return $this->collection($query, $request, ['section', 'status'], ['section'], ['course_id', 'academic_term_id', 'instructor_id', 'status']);
@@ -115,6 +134,7 @@ class AcademicController extends Controller
 
     public function storeOffering(Request $request): JsonResponse
     {
+        $this->authorize('create', CourseOffering::class);
         $offering = CourseOffering::create($request->validate([
             'course_id' => ['required', 'integer', 'exists:courses,id'],
             'academic_term_id' => ['required', 'integer', 'exists:academic_terms,id'],
@@ -131,18 +151,19 @@ class AcademicController extends Controller
 
     public function showOffering(CourseOffering $courseOffering): JsonResponse
     {
-        $this->authorizeOfferingAccess($courseOffering);
+        $this->authorize('view', $courseOffering);
         return $this->ok('Course offering retrieved successfully.', $courseOffering->load(['course', 'academicTerm', 'instructor']));
     }
 
     public function offeringStudents(Request $request, CourseOffering $courseOffering): JsonResponse
     {
-        $this->authorizeOfferingAccess($courseOffering);
+        $this->authorize('viewRoster', $courseOffering);
         return $this->collection($courseOffering->enrollments()->with('student'), $request, ['id', 'enrollment_date', 'status'], [], ['status']);
     }
 
     public function updateOffering(Request $request, CourseOffering $courseOffering): JsonResponse
     {
+        $this->authorize('update', $courseOffering);
         $courseOffering->update($request->validate([
             'course_id' => ['sometimes', 'integer', 'exists:courses,id'],
             'academic_term_id' => ['sometimes', 'integer', 'exists:academic_terms,id'],
@@ -159,21 +180,25 @@ class AcademicController extends Controller
 
     public function deleteOffering(CourseOffering $courseOffering): JsonResponse
     {
+        $this->authorize('delete', $courseOffering);
         $courseOffering->update(['status' => 'cancelled']);
         return $this->ok('Course offering cancelled successfully.');
     }
 
     public function enrollments(Request $request): JsonResponse
     {
-        $query = Enrollment::with(['student', 'courseOffering.course', 'courseOffering.academicTerm', 'grade']);
-        $role = $request->user()->role;
+        $this->authorize('viewAny', Enrollment::class);
 
-        if ($role === 'student') {
-            $query->where('student_id', $request->user()->student_id);
-        } elseif ($role === 'instructor') {
-            $query->whereHas('courseOffering', fn ($builder) => $builder->where('instructor_id', $request->user()->id));
+        $query = Enrollment::with(['student', 'courseOffering.course', 'courseOffering.academicTerm', 'grade']);
+        $user = $request->user();
+
+        if ($user->isStudent()) {
+            abort_unless($user->student_id !== null, 403, 'No student profile is linked to this account.');
+            $query->where('student_id', $user->student_id);
+        } elseif ($user->isInstructor()) {
+            $query->whereHas('courseOffering', fn ($builder) => $builder->where('instructor_id', $user->id));
         } else {
-            abort_unless(in_array($role, ['administrator', 'registrar', 'staff'], true), 403, 'You are not authorized to list enrollments.');
+            abort_unless($user->isManagement(), 403, 'You are not authorized to list enrollments.');
         }
 
         return $this->collection($query, $request, ['status', 'enrollment_date'], ['status'], ['student_id', 'course_offering_id', 'status']);
@@ -181,6 +206,7 @@ class AcademicController extends Controller
 
     public function storeEnrollment(Request $request): JsonResponse
     {
+        $this->authorize('create', Enrollment::class);
         $data = $request->validate([
             'student_id' => ['required', 'integer', 'exists:students,id'],
             'course_offering_id' => ['required', 'integer', 'exists:course_offerings,id'],
@@ -205,39 +231,44 @@ class AcademicController extends Controller
 
     public function showEnrollment(Enrollment $enrollment): JsonResponse
     {
-        $this->authorizeEnrollmentAccess($enrollment);
+        $this->authorize('view', $enrollment);
         return $this->ok('Enrollment retrieved successfully.', $enrollment->load(['student', 'courseOffering.course', 'courseOffering.academicTerm', 'grade']));
     }
 
     public function studentEnrollments(Student $student): JsonResponse
     {
-        $this->authorizeStudent($student);
+        $this->authorize('view', $student);
         return $this->collection($student->enrollments()->with(['courseOffering.course', 'courseOffering.academicTerm', 'grade']), request(), ['enrollment_date', 'status']);
     }
 
     public function updateEnrollment(Request $request, Enrollment $enrollment): JsonResponse
     {
+        $this->authorize('update', $enrollment);
         $enrollment->update($request->validate(['status' => ['required', Rule::in(['enrolled', 'dropped', 'completed'])]]));
         return $this->ok('Enrollment updated successfully.', $enrollment->fresh());
     }
 
     public function deleteEnrollment(Enrollment $enrollment): JsonResponse
     {
+        $this->authorize('delete', $enrollment);
         $enrollment->update(['status' => 'dropped']);
         return $this->ok('Enrollment dropped successfully.');
     }
 
     public function grades(Request $request): JsonResponse
     {
-        $query = Grade::with(['enrollment.student', 'enrollment.courseOffering.course', 'enrollment.courseOffering.academicTerm']);
-        $role = $request->user()->role;
+        $this->authorize('viewAny', Grade::class);
 
-        if ($role === 'student') {
-            $query->whereHas('enrollment', fn ($builder) => $builder->where('student_id', $request->user()->student_id));
-        } elseif ($role === 'instructor') {
-            $query->whereHas('enrollment.courseOffering', fn ($builder) => $builder->where('instructor_id', $request->user()->id));
+        $query = Grade::with(['enrollment.student', 'enrollment.courseOffering.course', 'enrollment.courseOffering.academicTerm']);
+        $user = $request->user();
+
+        if ($user->isStudent()) {
+            abort_unless($user->student_id !== null, 403, 'No student profile is linked to this account.');
+            $query->whereHas('enrollment', fn ($builder) => $builder->where('student_id', $user->student_id));
+        } elseif ($user->isInstructor()) {
+            $query->whereHas('enrollment.courseOffering', fn ($builder) => $builder->where('instructor_id', $user->id));
         } else {
-            abort_unless(in_array($role, ['administrator', 'registrar', 'staff'], true), 403, 'You are not authorized to list grades.');
+            abort_unless($user->isManagement(), 403, 'You are not authorized to list grades.');
         }
 
         return $this->collection($query, $request, ['created_at'], ['remarks'], ['enrollment_id']);
@@ -245,6 +276,8 @@ class AcademicController extends Controller
 
     public function storeGrade(Request $request): JsonResponse
     {
+        $this->authorize('create', Grade::class);
+
         $data = $request->validate([
             'enrollment_id' => ['required', 'integer', 'exists:enrollments,id', 'unique:grades,enrollment_id'],
             'midterm_grade' => ['nullable', 'numeric', 'between:0,100'],
@@ -252,13 +285,13 @@ class AcademicController extends Controller
             'remarks' => ['nullable', 'string'],
         ]);
 
-        $this->authorizeGradeAccess($request, $data['enrollment_id']);
+        $this->authorize('grade', Enrollment::findOrFail($data['enrollment_id']));
         return $this->created('Grade recorded successfully.', Grade::create($data));
     }
 
     public function updateGrade(Request $request, Grade $grade): JsonResponse
     {
-        $this->authorizeGradeAccess($request, $grade->enrollment_id);
+        $this->authorize('update', $grade);
         $grade->update($request->validate([
             'midterm_grade' => ['nullable', 'numeric', 'between:0,100'],
             'final_grade' => ['nullable', 'numeric', 'between:0,100'],
@@ -269,19 +302,19 @@ class AcademicController extends Controller
 
     public function showGrade(Grade $grade): JsonResponse
     {
-        $this->authorizeEnrollmentAccess($grade->enrollment);
+        $this->authorize('view', $grade);
         return $this->ok('Grade retrieved successfully.', $grade->load(['enrollment.student', 'enrollment.courseOffering.course', 'enrollment.courseOffering.academicTerm']));
     }
 
     public function studentGrades(Student $student): JsonResponse
     {
-        $this->authorizeStudent($student);
+        $this->authorize('view', $student);
         return $this->collection($student->enrollments()->whereHas('grade')->with(['grade', 'courseOffering.course', 'courseOffering.academicTerm']), request(), ['created_at']);
     }
 
     public function studentAcademicRecord(Student $student): JsonResponse
     {
-        $this->authorizeStudent($student);
+        $this->authorize('view', $student);
         $enrollments = $student->enrollments()->with(['courseOffering.course', 'courseOffering.academicTerm', 'grade'])->get();
         $record = $enrollments->groupBy(fn (Enrollment $enrollment) => $enrollment->courseOffering->academicTerm->id)
             ->map(fn ($termEnrollments) => [
@@ -290,50 +323,6 @@ class AcademicController extends Controller
             ])->values();
 
         return $this->ok('Academic record retrieved successfully.', ['student' => $student, 'terms' => $record]);
-    }
-
-    private function authorizeGradeAccess(Request $request, int $enrollmentId): void
-    {
-        $user = $request->user();
-        if (in_array($user->role, ['administrator', 'staff', 'registrar'], true)) {
-            return;
-        }
-
-        abort_unless($user->role === 'instructor' && Enrollment::whereKey($enrollmentId)->whereHas('courseOffering', fn ($query) => $query->where('instructor_id', $user->id))->exists(), 403, 'You are not authorized to modify this grade.');
-    }
-
-    private function authorizeOfferingAccess(CourseOffering $courseOffering): void
-    {
-        $user = request()->user();
-        abort_unless(
-            in_array($user->role, ['administrator', 'registrar', 'staff'], true)
-                || ($user->role === 'instructor' && $courseOffering->instructor_id === $user->id),
-            403,
-            'You are not authorized to access this course offering.'
-        );
-    }
-
-    private function authorizeEnrollmentAccess(Enrollment $enrollment): void
-    {
-        $user = request()->user();
-        abort_unless(
-            in_array($user->role, ['administrator', 'registrar', 'staff'], true)
-                || ($user->role === 'instructor' && $enrollment->courseOffering()->where('instructor_id', $user->id)->exists())
-                || ($user->role === 'student' && $user->student_id === $enrollment->student_id),
-            403,
-            'You are not authorized to access this enrollment.'
-        );
-    }
-
-    private function authorizeStudent(Student $student): void
-    {
-        $user = request()->user();
-        abort_unless(
-            in_array($user->role, ['administrator', 'registrar', 'staff'], true)
-                || ($user->role === 'student' && $user->student_id === $student->id),
-            403,
-            'You are not authorized to access this student.'
-        );
     }
 
     private function collection($query, Request $request, array $sortable, array $searchable = [], array $filterable = []): JsonResponse

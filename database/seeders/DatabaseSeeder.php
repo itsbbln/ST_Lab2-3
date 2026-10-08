@@ -22,6 +22,7 @@ class DatabaseSeeder extends Seeder
         $users = collect([
             ['name' => 'System Administrator', 'email' => 'admin@example.com', 'role' => 'administrator'],
             ['name' => 'Registrar Staff', 'email' => 'registrar@example.com', 'role' => 'registrar'],
+            ['name' => 'Records Staff', 'email' => 'staff@example.com', 'role' => 'staff'],
             ['name' => 'Instructor One', 'email' => 'instructor1@example.com', 'role' => 'instructor'],
             ['name' => 'Instructor Two', 'email' => 'instructor2@example.com', 'role' => 'instructor'],
             ['name' => 'Demo Student', 'email' => 'student@example.com', 'role' => 'student'],

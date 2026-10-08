@@ -60,6 +60,7 @@ Seeded accounts use the password `password`:
 
 - `admin@example.com` (administrator)
 - `registrar@example.com` (registrar)
+- `staff@example.com` (staff)
 - `instructor1@example.com` (instructor)
 - `instructor2@example.com` (instructor)
 - `student@example.com` (student)

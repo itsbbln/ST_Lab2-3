@@ -6,7 +6,9 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use App\Support\Roles;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
@@ -54,5 +56,30 @@ class User extends Authenticatable
     public function student(): BelongsTo
     {
         return $this->belongsTo(Student::class);
+    }
+
+    public function offerings(): HasMany
+    {
+        return $this->hasMany(CourseOffering::class, 'instructor_id');
+    }
+
+    public function isManagement(): bool
+    {
+        return Roles::isManagement($this->role);
+    }
+
+    public function isInstructor(): bool
+    {
+        return $this->role === Roles::INSTRUCTOR;
+    }
+
+    public function isStudent(): bool
+    {
+        return $this->role === Roles::STUDENT;
+    }
+
+    public function isActive(): bool
+    {
+        return $this->status === 'active';
     }
 }

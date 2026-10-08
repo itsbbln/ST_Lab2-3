@@ -40,7 +40,7 @@ Expected: `success` is `True`, and the service identifies version `v1`. A succes
 
 The seeder creates five role accounts and the required entity counts. Open [openapi.yaml](openapi.yaml), [erd.md](erd.md), and import the Postman collection at [student-information-api.postman_collection.json](../postman/collections/student-information-api.postman_collection.json). The sample password for these local-only seeded accounts is `password`.
 
-Accounts: `admin@example.com`, `registrar@example.com`, `instructor1@example.com`, `instructor2@example.com`, and `student@example.com`.
+Accounts: `admin@example.com`, `registrar@example.com`, `staff@example.com`, `instructor1@example.com`, `instructor2@example.com`, and `student@example.com`.
 
 ## 4. Authenticate and Test the 401 Boundary
 

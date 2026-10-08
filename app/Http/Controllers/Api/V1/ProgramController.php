@@ -12,6 +12,7 @@ class ProgramController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', Program::class);
         $query = Program::query();
 
         if ($request->filled('search')) {
@@ -41,6 +42,7 @@ class ProgramController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        $this->authorize('create', Program::class);
         $program = Program::create($request->validate([
             'code' => ['required', 'string', 'max:30', 'unique:programs,code'],
             'name' => ['required', 'string', 'max:255'],
@@ -53,11 +55,14 @@ class ProgramController extends Controller
 
     public function show(Program $program): JsonResponse
     {
+        $this->authorize('view', $program);
+
         return response()->json(['success' => true, 'message' => 'Program retrieved successfully.', 'data' => $program]);
     }
 
     public function update(Request $request, Program $program): JsonResponse
     {
+        $this->authorize('update', $program);
         $program->update($request->validate([
             'code' => ['sometimes', 'string', 'max:30', Rule::unique('programs', 'code')->ignore($program)],
             'name' => ['sometimes', 'string', 'max:255'],
@@ -70,6 +75,7 @@ class ProgramController extends Controller
 
     public function destroy(Program $program): JsonResponse
     {
+        $this->authorize('delete', $program);
         $program->update(['status' => 'inactive']);
 
         return response()->json(['success' => true, 'message' => 'Program deactivated successfully.', 'data' => null]);

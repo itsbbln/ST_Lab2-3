@@ -12,12 +12,14 @@ class StudentController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $query = Student::with('program');
+        $this->authorize('viewAny', Student::class);
 
-        if ($request->user()->role === 'student') {
-            $query->whereKey($request->user()->student_id);
-        } else {
-            abort_unless(in_array($request->user()->role, ['administrator', 'registrar', 'staff'], true), 403, 'You are not authorized to list student records.');
+        $query = Student::with('program');
+        $user = $request->user();
+
+        if ($user->isStudent()) {
+            abort_unless($user->student_id !== null, 403, 'No student profile is linked to this account.');
+            $query->whereKey($user->student_id);
         }
 
         if ($request->filled('search')) {
@@ -51,6 +53,7 @@ class StudentController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        $this->authorize('create', Student::class);
         $student = Student::create($request->validate($this->rules()));
 
         return response()->json(['success' => true, 'message' => 'Student created successfully.', 'data' => $student->load('program')], 201);
@@ -58,14 +61,14 @@ class StudentController extends Controller
 
     public function show(Student $student): JsonResponse
     {
-        $this->authorizeStudent($student);
+        $this->authorize('view', $student);
 
         return response()->json(['success' => true, 'message' => 'Student retrieved successfully.', 'data' => $student->load('program')]);
     }
 
     public function update(Request $request, Student $student): JsonResponse
     {
-        $this->authorizeStudent($student);
+        $this->authorize('update', $student);
         $student->update($request->validate($this->rules($student, true)));
 
         return response()->json(['success' => true, 'message' => 'Student updated successfully.', 'data' => $student->fresh()->load('program')]);
@@ -73,7 +76,7 @@ class StudentController extends Controller
 
     public function destroy(Student $student): JsonResponse
     {
-        $this->authorizeStudent($student);
+        $this->authorize('delete', $student);
         $student->update(['status' => 'inactive']);
 
         return response()->json(['success' => true, 'message' => 'Student deactivated successfully.', 'data' => null]);
@@ -95,11 +98,5 @@ class StudentController extends Controller
             'year_level' => [$partial ? 'sometimes' : 'required', 'integer', 'between:1,8'],
             'status' => ['sometimes', Rule::in(['active', 'inactive', 'graduated'])],
         ];
-    }
-
-    private function authorizeStudent(Student $student): void
-    {
-        $user = request()->user();
-        abort_unless(in_array($user->role, ['administrator', 'registrar', 'staff'], true) || ($user->role === 'student' && $user->student_id === $student->id), 403, 'You are not authorized to access this student.');
     }
 }
