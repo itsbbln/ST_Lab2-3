@@ -1,6 +1,6 @@
 # Laboratory II Frontend Checklist
 
-Status checked 2026-09-27 against the lab PDF, frontend source, automated tests, and live browser checks. `[x]` verified, `[~]` implemented in part or not fully demonstrated, `[ ]` still needs evidence/action.
+Status checked 2026-10-08 against the lab PDF, frontend source, automated tests, and previously recorded live browser checks. `[x]` verified, `[~]` implemented in part or not fully demonstrated, `[ ]` still needs evidence/action.
 
 ## Project and API Integration
 
@@ -45,7 +45,7 @@ Status checked 2026-09-27 against the lab PDF, frontend source, automated tests,
 
 ## Tests and Evidence
 
-- [x] `npm test`: 2 test files passed, 7 tests passed. Covers API headers, 401/422/network handling, login/logout, and role-protected routes.
+- [x] `npm test`: 2 test files passed, 9 tests passed. Covers API headers, 401/422/network handling, login/logout, role-protected routes, and server-driven student pagination.
 - [x] `npm run build` completed successfully.
 - [x] Live browser verification: administrator dashboard and seeded counts; student role navigation/self-only list; direct management-route denial; student academic record.
 - [~] Capture and save screenshots of major modules, validation/forbidden states, and desktop/mobile views for submission.
@@ -57,6 +57,7 @@ Status checked 2026-09-27 against the lab PDF, frontend source, automated tests,
 - [x] Setup/run/build/test instructions: [README.md](../README.md).
 - [x] Screen-to-endpoint-to-role map: [api-integration-map.md](api-integration-map.md).
 - [x] AI tool, work summary, review, and evidence log: [ai-development-log.md](ai-development-log.md).
+- [x] Architecture, routing, API client, authentication, and state strategy: [architecture.md](architecture.md).
 - [x] Backend API contract: [OpenAPI document](../../docs/openapi.yaml).
 
 ## Suggested Live Demonstration Order

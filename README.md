@@ -1,27 +1,36 @@
-# Student Information Management API
+# Student Information Management System
 
-Backend-only REST API for the AI-assisted framework-based REST API laboratory, built with Laravel 12, Sanctum, and PostgreSQL.
+A student information management application built for the AI-assisted REST API and frontend integration laboratory activities. It contains two separate applications:
 
-## Current Implementation
+- **Backend:** Laravel 12 REST API, Sanctum bearer-token authentication, and PostgreSQL.
+- **Frontend:** React 18/Vite browser client that consumes the API. It has no direct database connection.
 
-- Laravel project scaffold with PostgreSQL configuration.
-- Sanctum token authentication foundation.
-- Versioned routes under `/api/v1`.
-- Normalized migrations for users, programs, students, courses, academic terms, course offerings, enrollments, and grades.
-- Programs and Students CRUD endpoints with validation, search, filtering, sorting, and pagination.
-- Courses, academic terms, course offerings, enrollments, grades, and academic-record endpoints.
-- Role and object-level authorization for administrators, registrars, instructors, and students.
-- Deterministic seed data meeting the laboratory demonstration counts.
-- Case-insensitive search, allowlisted filters and sort fields, and bounded pagination on collections.
-- OpenAPI contract, importable Postman collection, ERD, lab checklist, and a role-by-role verification guide.
+The backend is authoritative for stored data, validation, authentication, and authorization. API routes are versioned under `/api/v1`.
 
-## Prerequisites
+## Technology and Prerequisites
 
-- PHP 8.2 or newer with `pdo_pgsql` and `pgsql` enabled.
-- Composer.
-- PostgreSQL 14 or newer.
+| Area | Technology | Requirements |
+| --- | --- | --- |
+| Backend | PHP, Laravel, Sanctum | PHP 8.2+, Composer, and PHP `pdo_pgsql`/`pgsql` extensions |
+| Database | PostgreSQL | PostgreSQL 14+ and a local database/user |
+| Frontend | React, Vite, Vitest | Node.js 20+ and npm |
+| API testing | Postman | Import the collection at `postman/collections/student-information-api.postman_collection.json` |
 
-## Setup
+## Features
+
+- Authentication: login, logout/token revocation, current-user endpoint, hashed passwords, and active-account enforcement.
+- User and role administration: administrators can list, create, view, update, and deactivate accounts. Student accounts must link to one student profile; passwords are never returned. The final active administrator cannot be demoted or deactivated.
+- Academic resources: students, programs, courses, academic terms, course offerings, enrollments, grades, and term-grouped academic records.
+- Server-side role and object-level access control for administrators, registrars, staff, instructors, and students.
+- Validated CRUD and academic transactions, duplicate-enrollment conflict handling, and referential integrity.
+- Backend-supported search, filters, allowlisted sorting, and bounded pagination.
+- Role-aware frontend screens, protected routes, loading/empty/error states, form feedback, and responsive layouts.
+
+## Run the Backend
+
+Run these commands from the repository root in PowerShell.
+
+### 1. Install dependencies and configure the environment
 
 ```powershell
 composer install
@@ -29,117 +38,129 @@ Copy-Item .env.example .env
 php artisan key:generate
 ```
 
-Create the `student_information` PostgreSQL database, then set `DB_USERNAME` and `DB_PASSWORD` in `.env`. Do not commit `.env`. Apply migrations and load seed data with:
+Create a PostgreSQL database named `student_information` (for example, `createdb -U postgres student_information`). Set `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, and `DB_PASSWORD` in `.env` to match your local PostgreSQL setup. Keep `.env` private and never commit database credentials or tokens.
+
+### 2. Apply the schema and load demonstration data
 
 ```powershell
 php artisan migrate --seed
+```
+
+The seeder creates the minimum demonstration quantities or more: 6 user accounts, 3 programs, 100 students, 20 courses, 2 academic terms, 20 course offerings, 200 enrollments, and 100 grades. To rebuild all data, use `php artisan migrate:fresh --seed` **only** with a disposable database because this command drops its tables.
+
+### 3. Start and check the API
+
+```powershell
 php artisan serve
 ```
 
-The API health check is available at `GET http://127.0.0.1:8000/api/v1/health`.
+The default API base URL is `http://127.0.0.1:8000/api/v1`; its health endpoint is `GET /health`. For example:
 
-API documentation is available in [docs/openapi.yaml](docs/openapi.yaml). The importable Postman collection is [postman/collections/student-information-api.postman_collection.json](postman/collections/student-information-api.postman_collection.json). The schema diagram is [docs/erd.md](docs/erd.md), the requirement status is [docs/lab-requirements-checklist.md](docs/lab-requirements-checklist.md), and the hands-on test and explanation walkthrough is [docs/verification-guide.md](docs/verification-guide.md).
+```powershell
+Invoke-RestMethod http://127.0.0.1:8000/api/v1/health
+```
 
-## API Routes
+## Run the Frontend
 
-- `POST /api/v1/auth/login`
-- `POST /api/v1/auth/logout`
-- `GET /api/v1/auth/me`
-- `api/v1/programs` CRUD
-- `api/v1/students` CRUD
-- `api/v1/courses` CRUD
-- `api/v1/academic-terms` CRUD
-- `api/v1/course-offerings` CRUD
-- `api/v1/enrollments` and nested enrollment views
-- `api/v1/grades` and nested grade views
-- `api/v1/students/{id}/academic-record`
+Keep the backend running, open a second PowerShell terminal, and run:
 
-Protected routes require `Authorization: Bearer <token>`. Students can access their own profile and academic records only; instructors can access offerings and grades assigned to them; administrators and registrars manage records. Collection routes use `page` and `per_page` (maximum 100), `sort` (prefix `-` for descending), and resource-specific filters/search.
+```powershell
+Set-Location frontend
+npm ci
+Copy-Item .env.example .env
+npm run dev
+```
 
-Seeded accounts use the password `password`:
+Vite normally serves the frontend at `http://localhost:5173`. `VITE_API_BASE_URL` in `frontend/.env` configures the API origin and defaults to `http://127.0.0.1:8000/api/v1`. This is public client configuration, not a place for secrets. If the frontend and backend use different origins, allow the development frontend origin in the backend's CORS configuration; do not disable CORS security globally.
 
-- `admin@example.com` (administrator)
-- `registrar@example.com` (registrar)
-- `staff@example.com` (staff)
-- `instructor1@example.com` (instructor)
-- `instructor2@example.com` (instructor)
-- `student@example.com` (student)
+## Demonstration Accounts
 
-Run the automated suite (tests use in-memory SQLite and do not modify your PostgreSQL demo data) with:
+After seeding, these local demonstration accounts use the password `password`:
+
+| Email | Role |
+| --- | --- |
+| `admin@example.com` | Administrator |
+| `registrar@example.com` | Registrar |
+| `staff@example.com` | Staff |
+| `instructor1@example.com` | Instructor |
+| `instructor2@example.com` | Instructor |
+| `student@example.com` | Student |
+
+These are seeded local accounts only. Do not use the sample password or accounts in a deployed environment.
+
+## API Overview and Access
+
+All resource paths below are relative to `/api/v1`. Protected routes require `Authorization: Bearer <token>`; obtain a token from `POST /auth/login`.
+
+| Resource | Endpoints | Access summary |
+| --- | --- | --- |
+| Authentication | `POST /auth/login`, `POST /auth/logout`, `GET /auth/me` | Login is public; the other routes require authentication. |
+| Users | `GET/POST /users`, `GET/PATCH/PUT/DELETE /users/{id}` | Administrator only. DELETE deactivates the account. |
+| Students | `/students` and `/students/{id}` | Management roles manage records; students and instructors have restricted, server-scoped reads. |
+| Programs | `/programs` and `/programs/{id}` | Management roles manage records. |
+| Courses | `/courses` and `/courses/{id}` | Management roles manage records. |
+| Academic terms | `/academic-terms` and `/academic-terms/{id}` | Management roles manage records. |
+| Course offerings | `/course-offerings`, `/course-offerings/{id}`, `/course-offerings/{id}/students` | Management roles manage offerings; instructors see assigned offerings and rosters. |
+| Enrollments | `/enrollments`, `/enrollments/{id}`, `/students/{id}/enrollments` | Management roles manage enrollment; instructors and students see only authorized records. |
+| Grades | `/grades`, `/grades/{id}`, `/students/{id}/grades` | Management roles and assigned instructors may write grades; reads are role-scoped. |
+| Academic record | `/students/{id}/academic-record` | Managers and the authorized student/instructor may read the requested record. |
+
+Collections use `page` and `per_page` (maximum 100), allowlisted `sort` fields (prefix a field with `-` for descending order), and resource-specific search/filter parameters. Server-side authorization remains in force even when frontend navigation hides a route or action.
+
+### Authenticate and call a protected endpoint
+
+The API hashes passwords, issues a Sanctum bearer token after a successful login, returns the current account at `GET /auth/me`, and revokes the current token at `POST /auth/logout`. For example, with the API running:
+
+```powershell
+$base = 'http://127.0.0.1:8000/api/v1'
+$login = Invoke-RestMethod -Method Post "$base/auth/login" `
+  -ContentType 'application/json' `
+  -Body (@{ email = 'admin@example.com'; password = 'password' } | ConvertTo-Json)
+$headers = @{ Authorization = "Bearer $($login.data.token)" }
+Invoke-RestMethod "$base/auth/me" -Headers $headers
+Invoke-RestMethod "$base/students?page=1&per_page=10" -Headers $headers
+```
+
+The API responds with JSON for API errors: `401` for missing or invalid authentication, `403` for a forbidden action, `404` for a missing resource, `409` for a conflicting operation (such as duplicate enrollment), and `422` for validation failures. Set `APP_DEBUG=false` in production and configure CORS to allow only the frontend origins that should access the API.
+
+The frontend stores the Sanctum token in browser local storage for this laboratory client and clears it when the API returns `401`. Local storage is accessible to JavaScript; for a production deployment, evaluate a secure HttpOnly cookie/session design and appropriate XSS protections. The backend remains responsible for authorization.
+
+## Database and Design
+
+Migrations define the users, programs, students, courses, academic terms, course offerings, enrollments, and grades tables. Foreign keys preserve relationships; student numbers, course codes, enrollment pairs, and grade-to-enrollment links are unique. Eloquent models and controllers handle persistence and validation, while role middleware, policies, and scoped queries enforce permissions.
+
+## Testing and Production Build
+
+From the repository root, run the backend suite:
 
 ```powershell
 php artisan test
 ```
 
-## Lab Deliverables and Walkthrough
+Backend tests use in-memory SQLite and do not alter the PostgreSQL demonstration database. From the `frontend` directory, run frontend tests and create the production build:
 
-- Requirements status: [docs/lab-requirements-checklist.md](docs/lab-requirements-checklist.md)
-- API contract: [docs/openapi.yaml](docs/openapi.yaml)
-- ERD: [docs/erd.md](docs/erd.md)
-- Postman collection: [postman/collections/student-information-api.postman_collection.json](postman/collections/student-information-api.postman_collection.json)
-- Step-by-step API tests and explanation prompts: [docs/verification-guide.md](docs/verification-guide.md)
+```powershell
+npm test
+npm run build
+```
 
-## Development Notes
+The frontend build output is written to `frontend/dist/`. The automated tests cover authentication, validation, role and object-level access, collection queries, enrollment conflicts, user administration, frontend API error handling, authentication flows, protected routes, and server-driven student pagination.
 
-AI assistance is used for bounded scaffolding, schema review, validation patterns, and test planning. Generated code is reviewed, syntax-checked, and validated through Laravel route and migration checks before acceptance.
+## Lab Documentation and Deliverables
 
----
+- [Backend requirement checklist](docs/lab-requirements-checklist.md)
+- [OpenAPI contract](docs/openapi.yaml)
+- [Entity relationship diagram](docs/erd.md)
+- [Postman collection](postman/collections/student-information-api.postman_collection.json)
+- [Backend verification and demonstration guide](docs/verification-guide.md)
+- [Frontend setup README](frontend/README.md)
+- [Frontend API integration map](frontend/docs/api-integration-map.md)
+- [Frontend architecture note](frontend/docs/architecture.md)
+- [Frontend AI development log](frontend/docs/ai-development-log.md)
+- [Frontend requirement checklist and demonstration order](frontend/docs/lab2-checklist.md)
 
+The verification guide and checklists distinguish implementation and automated test evidence from activities that still need to be demonstrated live, such as frontend/backend walkthroughs, screenshots, and the student's technical explanation.
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+## AI-Assisted Development and Verification
 
-## About Laravel
-
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
-
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
-
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
-
-## Learning Laravel
-
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
-
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-## Laravel Sponsors
-
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
-
-### Premium Partners
-
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
-
-## Contributing
-
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
-
-## Code of Conduct
-
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+AI assistance was used for bounded scaffolding, schema and authorization review, API/client integration, validation and test planning, and documentation. Generated changes were reviewed against the laboratory requirements and the existing API behavior, then verified with Laravel feature tests, Vitest, PHP formatting checks, route checks, and the frontend production build. The task-specific record and human verification notes are in the [AI development log](frontend/docs/ai-development-log.md).

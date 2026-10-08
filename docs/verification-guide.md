@@ -55,6 +55,14 @@ The response includes a bearer token and user without a password hash. `GET /stu
 
 **Explain:** Sanctum identifies the caller from the token. Authentication answers “who are you?”; it does not itself decide whether that role can mutate a resource.
 
+### 4.1 Manage Accounts as an Administrator
+
+Only an administrator can use `GET/POST /users` and `GET/PUT/PATCH/DELETE /users/{id}`. The collection supports search, role/status filters, allowlisted sorting, and pagination. Create instructor, registrar, or staff accounts with a name, unique email, password, and allowed role. To create a student login, also provide an existing, not-yet-linked `student_id`. Passwords are hashed by the model and never returned. DELETE deactivates the account, so its existing token is rejected; the final active administrator cannot be demoted or deactivated.
+
+Try the account operations in the Postman “Users and Roles” folder, then sign in with a created account or attempt a user-list request as a registrar and confirm it receives 403.
+
+**Explain:** Why is user-account administration more restricted than academic-record management? What happens to a deactivated user's existing token?
+
 ## 5. Create, Validate, Search, and Partially Update a Student
 
 ```powershell

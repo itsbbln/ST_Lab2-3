@@ -15,10 +15,11 @@
     { "key": "studentId", "value": "1" },
     { "key": "courseId", "value": "1" },
     { "key": "termId", "value": "1" },
-    { "key": "instructorId", "value": "3" },
+    { "key": "instructorId", "value": "4" },
     { "key": "offeringId", "value": "1" },
     { "key": "enrollmentId", "value": "1" },
-    { "key": "gradeId", "value": "1" }
+    { "key": "gradeId", "value": "1" },
+    { "key": "userId", "value": "" }
   ],
   "item": [
     {
@@ -32,6 +33,16 @@
         { "name": "Current authenticated user", "request": { "method": "GET", "url": "{{baseUrl}}/auth/me" } },
         { "name": "Invalid password returns 401", "request": { "auth": { "type": "noauth" }, "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"wrong-password\"\n}" }, "url": "{{baseUrl}}/auth/login" } },
         { "name": "Logout and revoke current token", "request": { "method": "POST", "url": "{{baseUrl}}/auth/logout" } }
+      ]
+    },
+    {
+      "name": "Users and Roles (administrator only)",
+      "item": [
+        { "name": "Search/filter user accounts", "request": { "method": "GET", "url": "{{baseUrl}}/users?search=instructor&role=instructor&status=active&sort=name&per_page=10" } },
+        { "name": "Create instructor account", "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["if (pm.response.code === 201) pm.collectionVariables.set('userId', pm.response.json().data.id);"] } }], "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Laboratory Instructor\",\n  \"email\": \"lab.instructor@example.test\",\n  \"password\": \"change-this-password\",\n  \"role\": \"instructor\"\n}" }, "url": "{{baseUrl}}/users" } },
+        { "name": "Retrieve user account", "request": { "method": "GET", "url": "{{baseUrl}}/users/{{userId}}" } },
+        { "name": "Update user account", "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Updated Laboratory Instructor\"\n}" }, "url": "{{baseUrl}}/users/{{userId}}" } },
+        { "name": "Deactivate user account", "request": { "method": "DELETE", "url": "{{baseUrl}}/users/{{userId}}" } }
       ]
     },
     {

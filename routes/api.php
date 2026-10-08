@@ -1,13 +1,13 @@
 <?php
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\AcademicController;
+use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\ProgramController;
 use App\Http\Controllers\Api\V1\StudentController;
+use App\Http\Controllers\Api\V1\UserController;
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Support\Roles;
+use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function (): void {
     Route::get('/health', function () {
@@ -27,6 +27,9 @@ Route::prefix('v1')->group(function (): void {
 
         Route::middleware(EnsureUserIsActive::class)->group(function (): void {
             Route::get('/auth/me', [AuthController::class, 'me']);
+            Route::apiResource('users', UserController::class)
+                ->only(['index', 'store', 'show', 'update', 'destroy'])
+                ->middleware('role:'.Roles::ADMINISTRATOR);
             Route::apiResource('programs', ProgramController::class)->middlewareFor(['store', 'update', 'destroy'], 'role:'.Roles::management());
             Route::apiResource('students', StudentController::class)->middlewareFor(['store', 'update', 'destroy'], 'role:'.Roles::management());
             Route::get('/students/{student}/academic-record', [AcademicController::class, 'studentAcademicRecord']);

@@ -9,6 +9,7 @@ security:
   - bearerAuth: []
 tags:
   - name: Authentication
+  - name: Users and Roles
   - name: Core Resources
   - name: Academic Transactions
 paths:
@@ -46,6 +47,66 @@ paths:
       summary: Revoke the current token
       responses:
         '200': { $ref: '#/components/responses/Success' }
+  /users:
+    get:
+      tags: [Users and Roles]
+      summary: List user accounts (administrator only)
+      parameters:
+        - { $ref: '#/components/parameters/Search' }
+        - { name: role, in: query, schema: { type: string, enum: [administrator, registrar, staff, instructor, student] } }
+        - { name: status, in: query, schema: { type: string, enum: [active, inactive] } }
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PerPage' }
+        - { $ref: '#/components/parameters/Sort' }
+      responses:
+        '200': { $ref: '#/components/responses/PaginatedSuccess' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Users and Roles]
+      summary: Create a user account (administrator only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UserRequest' }
+      responses:
+        '201': { $ref: '#/components/responses/Created' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /users/{id}:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    get:
+      tags: [Users and Roles]
+      summary: Retrieve a user account (administrator only)
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Users and Roles]
+      summary: Update a user account (administrator only)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/UserUpdate' } } } }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { description: The last active administrator cannot be demoted or deactivated }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    patch:
+      tags: [Users and Roles]
+      summary: Partially update a user account (administrator only)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/UserUpdate' } } } }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { description: The last active administrator cannot be demoted or deactivated }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    delete:
+      tags: [Users and Roles]
+      summary: Deactivate a user account (administrator only)
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { description: The last active administrator cannot be deactivated }
   /programs:
     get:
       tags: [Core Resources]
@@ -149,6 +210,25 @@ components:
       type: object
       required: [email, password]
       properties: { email: { type: string, format: email }, password: { type: string, format: password } }
+    UserRequest:
+      type: object
+      required: [name, email, password, role]
+      properties:
+        name: { type: string, maxLength: 255 }
+        email: { type: string, format: email }
+        password: { type: string, format: password, minLength: 8, writeOnly: true }
+        role: { type: string, enum: [administrator, registrar, staff, instructor, student] }
+        status: { type: string, enum: [active, inactive], default: active }
+        student_id: { type: integer, nullable: true, description: Required for student accounts and unique across linked accounts. }
+    UserUpdate:
+      type: object
+      properties:
+        name: { type: string, maxLength: 255 }
+        email: { type: string, format: email }
+        password: { type: string, format: password, minLength: 8, writeOnly: true }
+        role: { type: string, enum: [administrator, registrar, staff, instructor, student] }
+        status: { type: string, enum: [active, inactive] }
+        student_id: { type: integer, nullable: true, description: Required when changing or updating an account to the student role. }
     ProgramRequest:
       type: object
       required: [code, name]

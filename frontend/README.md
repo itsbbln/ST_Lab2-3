@@ -34,7 +34,7 @@ npm test
 npm run build
 ```
 
-The Vitest suite checks request headers, error normalization, session expiry, network errors, login/logout, and role-protected routes. See [the API integration map](docs/api-integration-map.md) and [the AI development log](docs/ai-development-log.md).
+The Vitest suite checks request headers, error normalization, session expiry, network errors, login/logout, role-protected routes, and backend-driven pagination. See [the API integration map](docs/api-integration-map.md), [the architecture note](docs/architecture.md), and [the AI development log](docs/ai-development-log.md).
 
 ## Authentication and Data
 
