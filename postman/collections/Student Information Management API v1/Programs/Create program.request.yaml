@@ -1,0 +1,17 @@
+$kind: http-request
+url: "{{baseUrl}}/programs"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "code": "LAB-TEST",
+      "name": "Laboratory Test Program"
+    }
+scripts:
+  - type: afterResponse
+    code: if (pm.response.code === 201) pm.collectionVariables.set('programId', pm.response.json().data.id);
+    language: text/javascript
+order: 2000

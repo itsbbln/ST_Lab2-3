@@ -1,0 +1,5 @@
+$kind: http-request
+name: Search/filter courses
+url: "{{baseUrl}}/courses?search=information&status=active&sort=course_code&per_page=10"
+method: GET
+order: 1000

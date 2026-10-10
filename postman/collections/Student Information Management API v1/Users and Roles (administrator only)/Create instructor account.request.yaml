@@ -1,0 +1,19 @@
+$kind: http-request
+url: "{{baseUrl}}/users"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "name": "Laboratory Instructor",
+      "email": "lab.instructor@example.test",
+      "password": "change-this-password",
+      "role": "instructor"
+    }
+scripts:
+  - type: afterResponse
+    code: if (pm.response.code === 201) pm.collectionVariables.set('userId', pm.response.json().data.id);
+    language: text/javascript
+order: 2000

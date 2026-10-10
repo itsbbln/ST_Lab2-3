@@ -1,0 +1,19 @@
+$kind: http-request
+url: "{{baseUrl}}/grades"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "enrollment_id": {{enrollmentId}},
+      "midterm_grade": 88,
+      "final_grade": 91,
+      "remarks": "Laboratory demo"
+    }
+scripts:
+  - type: afterResponse
+    code: if (pm.response.code === 201) pm.collectionVariables.set('gradeId', pm.response.json().data.id);
+    language: text/javascript
+order: 2000

@@ -1,0 +1,4 @@
+$kind: http-request
+url: "{{baseUrl}}/grades?per_page=10&sort=-created_at"
+method: GET
+order: 1000

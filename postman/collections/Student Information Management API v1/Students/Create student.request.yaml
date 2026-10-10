@@ -1,0 +1,21 @@
+$kind: http-request
+url: "{{baseUrl}}/students"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "student_number": "DEMO-90001",
+      "first_name": "Ada",
+      "last_name": "Lovelace",
+      "email": "ada.demo@example.test",
+      "program_id": {{programId}},
+      "year_level": 1
+    }
+scripts:
+  - type: afterResponse
+    code: if (pm.response.code === 201) pm.collectionVariables.set('studentId', pm.response.json().data.id);
+    language: text/javascript
+order: 2000

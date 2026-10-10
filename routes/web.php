@@ -6,7 +6,13 @@ Route::get('/assets/{asset}', function (string $asset) {
     $file = base_path("frontend/dist/assets/{$asset}");
 
     if (file_exists($file)) {
-        return response()->file($file);
+        $contentType = match (strtolower(pathinfo($file, PATHINFO_EXTENSION))) {
+            'css' => 'text/css; charset=utf-8',
+            'woff2' => 'font/woff2',
+            default => null,
+        };
+
+        return response()->file($file, $contentType ? ['Content-Type' => $contentType] : []);
     }
 
     abort(404);

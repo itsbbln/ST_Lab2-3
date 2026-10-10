@@ -1,0 +1,18 @@
+$kind: http-request
+url: "{{baseUrl}}/courses"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "course_code": "LAB-101",
+      "course_title": "API Laboratory",
+      "units": 3
+    }
+scripts:
+  - type: afterResponse
+    code: if (pm.response.code === 201) pm.collectionVariables.set('courseId', pm.response.json().data.id);
+    language: text/javascript
+order: 2000

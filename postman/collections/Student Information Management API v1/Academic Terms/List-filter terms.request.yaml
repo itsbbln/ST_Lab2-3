@@ -1,0 +1,5 @@
+$kind: http-request
+name: List/filter terms
+url: "{{baseUrl}}/academic-terms?academic_year=2026-2027&status=active&per_page=10"
+method: GET
+order: 1000

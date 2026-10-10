@@ -1,0 +1,19 @@
+$kind: http-request
+url: "{{baseUrl}}/academic-terms"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "academic_year": "2030-2031",
+      "semester": "1st Semester",
+      "start_date": "2030-08-01",
+      "end_date": "2030-12-20"
+    }
+scripts:
+  - type: afterResponse
+    code: if (pm.response.code === 201) pm.collectionVariables.set('termId', pm.response.json().data.id);
+    language: text/javascript
+order: 2000

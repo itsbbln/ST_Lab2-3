@@ -180,19 +180,19 @@ class RoleAccessControlTest extends TestCase
         $instructorOne = $enrollmentOne->courseOffering->instructor;
         Sanctum::actingAs($instructorOne);
 
-        $this->postJson('/api/v1/grades', ['enrollment_id' => $enrollmentOne->id, 'final_grade' => 90])
+        $this->postJson('/api/v1/grades', ['enrollment_id' => $enrollmentOne->id, 'period' => 'final', 'final_grade' => 90])
             ->assertCreated();
 
-        $this->postJson('/api/v1/grades', ['enrollment_id' => $enrollmentTwo->id, 'final_grade' => 90])
+        $this->postJson('/api/v1/grades', ['enrollment_id' => $enrollmentTwo->id, 'period' => 'final', 'final_grade' => 90])
             ->assertForbidden();
 
         $otherGrade = Grade::create(['enrollment_id' => $enrollmentTwo->id, 'final_grade' => 80]);
         $this->getJson('/api/v1/grades/'.$otherGrade->id)->assertForbidden();
-        $this->patchJson('/api/v1/grades/'.$otherGrade->id, ['final_grade' => 75])->assertForbidden();
+        $this->patchJson('/api/v1/grades/'.$otherGrade->id, ['period' => 'final', 'final_grade' => 75])->assertForbidden();
 
         $ownGrade = Grade::where('enrollment_id', $enrollmentOne->id)->firstOrFail();
         $this->getJson('/api/v1/grades/'.$ownGrade->id)->assertOk();
-        $this->patchJson('/api/v1/grades/'.$ownGrade->id, ['final_grade' => 91])->assertOk();
+        $this->patchJson('/api/v1/grades/'.$ownGrade->id, ['period' => 'final', 'final_grade' => 91])->assertOk();
     }
 
     public function test_management_roles_can_read_every_record_kind(): void

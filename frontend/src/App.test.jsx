@@ -172,6 +172,96 @@ describe('frontend authentication and route protection', () => {
     expect(screen.getByLabelText('Program *')).toHaveValue('1');
   });
 
+  it('lets an administrator browse user accounts', async () => {
+    const admin = { id: 1, name: 'System Administrator', email: 'admin@example.com', role: 'administrator', status: 'active' };
+    const account = { id: 4, name: 'Registrar One', email: 'registrar@example.com', role: 'registrar', status: 'active' };
+    localStorage.setItem('sim_token', 'demo-token');
+    localStorage.setItem('sim_user', JSON.stringify(admin));
+    const fetchMock = vi.fn(async (url) => {
+      if (url.endsWith('/auth/me')) return jsonResponse({ success: true, data: admin });
+      if (url.includes('/users?')) return jsonResponse({ success: true, data: [account], meta: { current_page: 1, last_page: 1, total: 1, per_page: 10 } });
+      return jsonResponse({ success: true, data: [] });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    renderApp('/users');
+
+    expect(await screen.findByRole('heading', { name: 'Users' })).toBeInTheDocument();
+    expect(screen.getByText('registrar@example.com')).toBeInTheDocument();
+    expect(screen.getByText('registrar')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Add user' })).toHaveAttribute('href', '/users/new');
+  });
+
+  it('renders the grade submission timeline on the grade detail page', async () => {
+    const admin = { id: 1, name: 'System Administrator', email: 'admin@example.com', role: 'administrator', status: 'active' };
+    localStorage.setItem('sim_token', 'demo-token');
+    localStorage.setItem('sim_user', JSON.stringify(admin));
+    const grade = {
+      id: 5,
+      midterm_grade: '88.00',
+      final_grade: null,
+      remarks: null,
+      midterm_submitted_at: '2026-03-01T10:00:00.000000Z',
+      final_submitted_at: null,
+      enrollment: {
+        id: 12,
+        student: { id: 3, student_number: '2026-00003', first_name: 'Ada', last_name: 'Lovelace' },
+        course_offering: {
+          id: 9,
+          section: 'A',
+          course: { id: 2, course_code: 'BSIT101', course_title: 'Information Technology' },
+          academic_term: { id: 1, academic_year: '2026-2027', semester: '1st Semester' },
+        },
+      },
+    };
+    const fetchMock = vi.fn(async (url) => {
+      if (url.endsWith('/auth/me')) return jsonResponse({ success: true, data: admin });
+      if (url.endsWith('/grades/5')) return jsonResponse({ success: true, data: grade });
+      return jsonResponse({ success: true, data: [] });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    renderApp('/grades/5');
+
+    expect(await screen.findByRole('heading', { name: 'Ada Lovelace' })).toBeInTheDocument();
+    expect(screen.getByText(/^Submitted /)).toBeInTheDocument();
+    expect(screen.getByText('Not yet submitted')).toBeInTheDocument();
+  });
+
+  it('records midterm and final grades through a period selector', async () => {
+    const admin = { id: 1, name: 'System Administrator', email: 'admin@example.com', role: 'administrator', status: 'active' };
+    const enrollment = {
+      id: 12,
+      student: { id: 3, first_name: 'Ada', last_name: 'Lovelace' },
+      course_offering: { id: 9, section: 'A', course: { course_title: 'Information Technology' } },
+    };
+    localStorage.setItem('sim_token', 'demo-token');
+    localStorage.setItem('sim_user', JSON.stringify(admin));
+    const fetchMock = vi.fn(async (url) => {
+      if (url.endsWith('/auth/me')) return jsonResponse({ success: true, data: admin });
+      if (url.includes('/enrollments?')) return jsonResponse({ success: true, data: [enrollment], meta: { total: 1 } });
+      if (url.includes('/grades?')) return jsonResponse({ success: true, data: [], meta: { total: 0 } });
+      return jsonResponse({ success: true, data: [], message: 'Grade recorded successfully.' });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    renderApp('/grades/new');
+
+    expect(await screen.findByRole('heading', { name: 'Record grade' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Grading period *')).toHaveValue('midterm');
+    expect(screen.getByLabelText('Midterm grade *')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Grading period *'), { target: { value: 'final' } });
+    expect(screen.getByLabelText('Final grade *')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Enrollment *'), { target: { value: '12' } });
+    fireEvent.change(screen.getByLabelText('Final grade *'), { target: { value: '94' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save grade' }));
+
+    await waitFor(() => {
+      const post = fetchMock.mock.calls.find(([url, options]) => url.endsWith('/grades') && options?.method === 'POST');
+      expect(post).toBeTruthy();
+      expect(JSON.parse(post[1].body)).toMatchObject({ enrollment_id: 12, period: 'final', final_grade: 94 });
+    });
+  });
+
   it('automatically refreshes a resource search after typing', async () => {
     const user = { id: 1, name: 'System Administrator', email: 'admin@example.com', role: 'administrator', status: 'active' };
     localStorage.setItem('sim_token', 'demo-token');

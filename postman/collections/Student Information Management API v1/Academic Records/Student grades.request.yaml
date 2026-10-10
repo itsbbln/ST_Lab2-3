@@ -1,0 +1,4 @@
+$kind: http-request
+url: "{{baseUrl}}/students/{{studentId}}/grades"
+method: GET
+order: 2000

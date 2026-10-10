@@ -1,0 +1,20 @@
+$kind: collection
+description: Laboratory demonstration requests. Log in as admin first to populate the token variable. Requests use the seeded database and the IDs returned by create requests where possible.
+variables:
+  baseUrl: http://127.0.0.1:8000/api/v1
+  token: ""
+  programId: "1"
+  studentId: "1"
+  courseId: "1"
+  termId: "1"
+  instructorId: "4"
+  offeringId: "1"
+  enrollmentId: "1"
+  gradeId: "1"
+  userId: ""
+auth:
+  - id: 03bdce92-e208-4154-9739-8ef65a0e8dd1
+    type: bearer
+    name: bearer auth
+    credentials:
+      token: "{{token}}"

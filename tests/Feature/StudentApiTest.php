@@ -252,13 +252,104 @@ class StudentApiTest extends TestCase
         ])->assertStatus(409);
         $this->postJson('/api/v1/grades', [
             'enrollment_id' => $enrollmentId,
+            'period' => 'final',
             'final_grade' => 101,
         ])->assertStatus(422)->assertJsonPath('success', false);
         $this->postJson('/api/v1/grades', [
             'enrollment_id' => $enrollmentId,
+            'period' => 'midterm',
             'midterm_grade' => 88,
-            'final_grade' => 91,
         ])->assertCreated();
+    }
+
+    public function test_midterm_and_final_grades_are_recorded_on_separate_timelines(): void
+    {
+        [$enrollment] = $this->createAcademicRecords();
+        $admin = User::factory()->create(['role' => 'administrator', 'status' => 'active']);
+        Sanctum::actingAs($admin);
+
+        $this->postJson('/api/v1/grades', [
+            'period' => 'midterm',
+            'midterm_grade' => 88,
+            'enrollment_id' => $enrollment->id,
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.midterm_grade', '88.00')
+            ->assertJsonPath('data.final_grade', null)
+            ->assertJsonPath('data.final_submitted_at', null);
+
+        $this->assertNotNull(Grade::where('enrollment_id', $enrollment->id)->value('midterm_submitted_at'));
+
+        $this->postJson('/api/v1/grades', [
+            'period' => 'midterm',
+            'enrollment_id' => $enrollment->id,
+        ])->assertStatus(422)->assertJsonPath('success', false);
+
+        $this->postJson('/api/v1/grades', [
+            'period' => 'final',
+            'final_grade' => 94,
+            'enrollment_id' => $enrollment->id,
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.midterm_grade', '88.00')
+            ->assertJsonPath('data.final_grade', '94.00');
+
+        $grade = Grade::where('enrollment_id', $enrollment->id)->firstOrFail();
+        $this->assertNotNull($grade->midterm_submitted_at);
+        $this->assertNotNull($grade->final_submitted_at);
+
+        $this->patchJson('/api/v1/grades/'.$grade->id, [
+            'period' => 'final',
+            'final_grade' => 90,
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.final_grade', '90.00')
+            ->assertJsonPath('data.midterm_grade', '88.00');
+
+        $this->postJson('/api/v1/grades', [
+            'enrollment_id' => $enrollment->id,
+            'midterm_grade' => 88,
+        ])->assertStatus(422)->assertJsonPath('success', false);
+    }
+
+    public function test_enrollment_can_update_date_and_status_and_reactivate_a_dropped_record(): void
+    {
+        [$enrollment] = $this->createAcademicRecords();
+        $admin = User::factory()->create(['role' => 'administrator', 'status' => 'active']);
+        Sanctum::actingAs($admin);
+
+        $this->patchJson('/api/v1/enrollments/'.$enrollment->id, [
+            'enrollment_date' => '2026-09-15',
+            'status' => 'dropped',
+        ])->assertOk()
+            ->assertJsonPath('data.status', 'dropped')
+            ->assertJsonPath('data.enrollment_date', '2026-09-15T00:00:00.000000Z');
+
+        $this->postJson('/api/v1/enrollments', [
+            'student_id' => $enrollment->student_id,
+            'course_offering_id' => $enrollment->course_offering_id,
+            'enrollment_date' => '2026-09-20',
+        ])->assertOk()
+            ->assertJsonPath('data.status', 'enrolled')
+            ->assertJsonPath('data.enrollment_date', '2026-09-20T00:00:00.000000Z');
+
+        $this->assertDatabaseCount('enrollments', 2);
+    }
+
+    public function test_academic_term_partial_end_date_update_is_validated_against_existing_start_date(): void
+    {
+        [, , $offering] = $this->createAcademicRecords();
+        $term = $offering->academicTerm;
+        $admin = User::factory()->create(['role' => 'administrator', 'status' => 'active']);
+        Sanctum::actingAs($admin);
+
+        $this->patchJson('/api/v1/academic-terms/'.$term->id, [
+            'end_date' => '2026-07-01',
+        ])->assertStatus(422)->assertJsonPath('success', false);
+
+        $this->patchJson('/api/v1/academic-terms/'.$term->id, [
+            'end_date' => '2026-12-30',
+        ])->assertOk()->assertJsonPath('data.end_date', '2026-12-30T00:00:00.000000Z');
     }
 
     private function createAcademicRecords(bool $withInstructors = false): array

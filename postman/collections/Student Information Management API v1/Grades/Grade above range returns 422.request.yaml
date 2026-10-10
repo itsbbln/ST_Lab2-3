@@ -1,0 +1,13 @@
+$kind: http-request
+url: "{{baseUrl}}/grades"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "enrollment_id": {{enrollmentId}},
+      "final_grade": 101
+    }
+order: 3000

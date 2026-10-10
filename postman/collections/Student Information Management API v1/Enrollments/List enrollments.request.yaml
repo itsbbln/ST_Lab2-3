@@ -1,0 +1,4 @@
+$kind: http-request
+url: "{{baseUrl}}/enrollments?status=enrolled&per_page=10"
+method: GET
+order: 1000

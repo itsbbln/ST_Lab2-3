@@ -1,0 +1,12 @@
+$kind: http-request
+url: "{{baseUrl}}/students/{{studentId}}"
+method: PATCH
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "year_level": 2
+    }
+order: 5000

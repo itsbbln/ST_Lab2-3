@@ -1,0 +1,17 @@
+$kind: http-request
+url: "{{baseUrl}}/enrollments"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "student_id": {{studentId}},
+      "course_offering_id": {{offeringId}}
+    }
+scripts:
+  - type: afterResponse
+    code: if (pm.response.code === 201) pm.collectionVariables.set('enrollmentId', pm.response.json().data.id);
+    language: text/javascript
+order: 2000

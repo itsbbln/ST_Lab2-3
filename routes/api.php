@@ -64,6 +64,7 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/grades', [AcademicController::class, 'storeGrade'])->middleware('role:'.Roles::gradeWriters());
             Route::get('/grades/{grade}', [AcademicController::class, 'showGrade']);
             Route::match(['put', 'patch'], '/grades/{grade}', [AcademicController::class, 'updateGrade'])->middleware('role:'.Roles::gradeWriters());
+            Route::delete('/grades/{grade}', [AcademicController::class, 'deleteGrade'])->middleware('role:'.Roles::management());
             Route::get('/students/{student}/grades', [AcademicController::class, 'studentGrades']);
         });
     });

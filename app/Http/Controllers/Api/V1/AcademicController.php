@@ -12,6 +12,7 @@ use App\Models\Student;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class AcademicController extends Controller
 {
@@ -95,13 +96,21 @@ class AcademicController extends Controller
     public function updateTerm(Request $request, AcademicTerm $academicTerm): JsonResponse
     {
         $this->authorize('update', $academicTerm);
-        $academicTerm->update($request->validate([
+        $data = $request->validate([
             'academic_year' => ['sometimes', 'string', 'max:20'],
             'semester' => ['sometimes', 'string', 'max:30'],
             'start_date' => ['sometimes', 'date'],
-            'end_date' => ['sometimes', 'date', 'after:start_date'],
+            'end_date' => ['sometimes', 'date'],
             'status' => ['sometimes', Rule::in(['active', 'inactive', 'closed'])],
-        ]));
+        ]);
+
+        $startDate = $data['start_date'] ?? $academicTerm->start_date->toDateString();
+        $endDate = $data['end_date'] ?? $academicTerm->end_date->toDateString();
+        if (strtotime($endDate) <= strtotime($startDate)) {
+            throw ValidationException::withMessages(['end_date' => 'The end date must be after the start date.']);
+        }
+
+        $academicTerm->update($data);
 
         return $this->ok('Academic term updated successfully.', $academicTerm->fresh());
     }
@@ -219,12 +228,19 @@ class AcademicController extends Controller
             return response()->json(['success' => false, 'message' => 'Course offering is not available for enrollment.', 'errors' => []], 409);
         }
 
-        $duplicate = Enrollment::where('student_id', $data['student_id'])->where('course_offering_id', $data['course_offering_id'])->exists();
-        if ($duplicate) {
+        $existing = Enrollment::where('student_id', $data['student_id'])->where('course_offering_id', $data['course_offering_id'])->first();
+        if ($existing && $existing->status !== 'dropped') {
             return response()->json(['success' => false, 'message' => 'Student is already enrolled in this course offering.', 'errors' => []], 409);
         }
 
         $data['enrollment_date'] ??= now()->toDateString();
+
+        if ($existing) {
+            $existing->update(['enrollment_date' => $data['enrollment_date'], 'status' => 'enrolled']);
+
+            return $this->ok('Enrollment reactivated successfully.', $existing->fresh()->load(['student', 'courseOffering.course', 'courseOffering.academicTerm', 'grade']));
+        }
+
         $enrollment = Enrollment::create($data);
         return $this->created('Enrollment created successfully.', $enrollment->load(['student', 'courseOffering']));
     }
@@ -232,7 +248,7 @@ class AcademicController extends Controller
     public function showEnrollment(Enrollment $enrollment): JsonResponse
     {
         $this->authorize('view', $enrollment);
-        return $this->ok('Enrollment retrieved successfully.', $enrollment->load(['student', 'courseOffering.course', 'courseOffering.academicTerm', 'grade']));
+        return $this->ok('Enrollment retrieved successfully.', $enrollment->load(['student', 'courseOffering.course', 'courseOffering.academicTerm', 'courseOffering.instructor', 'grade']));
     }
 
     public function studentEnrollments(Student $student): JsonResponse
@@ -244,8 +260,11 @@ class AcademicController extends Controller
     public function updateEnrollment(Request $request, Enrollment $enrollment): JsonResponse
     {
         $this->authorize('update', $enrollment);
-        $enrollment->update($request->validate(['status' => ['required', Rule::in(['enrolled', 'dropped', 'completed'])]]));
-        return $this->ok('Enrollment updated successfully.', $enrollment->fresh());
+        $enrollment->update($request->validate([
+            'enrollment_date' => ['sometimes', 'date'],
+            'status' => ['sometimes', Rule::in(['enrolled', 'dropped', 'completed'])],
+        ]));
+        return $this->ok('Enrollment updated successfully.', $enrollment->fresh()->load(['student', 'courseOffering.course', 'courseOffering.academicTerm', 'grade']));
     }
 
     public function deleteEnrollment(Enrollment $enrollment): JsonResponse
@@ -278,32 +297,76 @@ class AcademicController extends Controller
     {
         $this->authorize('create', Grade::class);
 
-        $data = $request->validate([
-            'enrollment_id' => ['required', 'integer', 'exists:enrollments,id', 'unique:grades,enrollment_id'],
-            'midterm_grade' => ['nullable', 'numeric', 'between:0,100'],
-            'final_grade' => ['nullable', 'numeric', 'between:0,100'],
-            'remarks' => ['nullable', 'string'],
-        ]);
+        $data = $this->validateGrade($request);
 
-        $this->authorize('grade', Enrollment::findOrFail($data['enrollment_id']));
-        return $this->created('Grade recorded successfully.', Grade::create($data));
+        $enrollment = Enrollment::findOrFail($data['enrollment_id']);
+        $grade = Grade::firstOrNew(['enrollment_id' => $enrollment->id]);
+
+        if ($grade->exists) {
+            $this->authorize('update', $grade);
+        } else {
+            $this->authorize('grade', $enrollment);
+        }
+
+        $this->applyGradePeriod($grade, $data);
+
+        return $grade->wasRecentlyCreated
+            ? $this->created('Grade recorded successfully.', $grade)
+            : $this->ok('Grade updated successfully.', $grade);
     }
 
     public function updateGrade(Request $request, Grade $grade): JsonResponse
     {
         $this->authorize('update', $grade);
-        $grade->update($request->validate([
-            'midterm_grade' => ['nullable', 'numeric', 'between:0,100'],
-            'final_grade' => ['nullable', 'numeric', 'between:0,100'],
-            'remarks' => ['nullable', 'string'],
-        ]));
+
+        $this->applyGradePeriod($grade, $this->validateGrade($request, withEnrollment: false));
+
         return $this->ok('Grade updated successfully.', $grade->fresh());
+    }
+
+    /** @return array<string, mixed> */
+    private function validateGrade(Request $request, bool $withEnrollment = true): array
+    {
+        $rules = [
+            'period' => ['required', 'in:midterm,final'],
+            'midterm_grade' => ['required_if:period,midterm', 'nullable', 'numeric', 'between:0,100'],
+            'final_grade' => ['required_if:period,final', 'nullable', 'numeric', 'between:0,100'],
+            'remarks' => ['nullable', 'string'],
+        ];
+
+        if ($withEnrollment) {
+            $rules['enrollment_id'] = ['required', 'integer', 'exists:enrollments,id'];
+        }
+
+        return $request->validate($rules);
+    }
+
+    /** @param array<string, mixed> $data */
+    private function applyGradePeriod(Grade $grade, array $data): void
+    {
+        $period = $data['period'];
+        $grade->{"{$period}_grade"} = $data["{$period}_grade"];
+        $grade->{"{$period}_submitted_at"} = now();
+
+        if (array_key_exists('remarks', $data)) {
+            $grade->remarks = $data['remarks'];
+        }
+
+        $grade->save();
     }
 
     public function showGrade(Grade $grade): JsonResponse
     {
         $this->authorize('view', $grade);
         return $this->ok('Grade retrieved successfully.', $grade->load(['enrollment.student', 'enrollment.courseOffering.course', 'enrollment.courseOffering.academicTerm']));
+    }
+
+    public function deleteGrade(Grade $grade): JsonResponse
+    {
+        $this->authorize('delete', $grade);
+        $grade->delete();
+
+        return $this->ok('Grade deleted successfully.');
     }
 
     public function studentGrades(Student $student): JsonResponse

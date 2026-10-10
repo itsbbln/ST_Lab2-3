@@ -1,0 +1,5 @@
+$kind: http-request
+name: Search/filter user accounts
+url: "{{baseUrl}}/users?search=instructor&role=instructor&status=active&sort=name&per_page=10"
+method: GET
+order: 1000
