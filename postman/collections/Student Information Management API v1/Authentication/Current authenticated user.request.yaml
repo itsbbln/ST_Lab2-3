@@ -1,4 +1,4 @@
 $kind: http-request
-url: "{{baseUrl}}/auth/me"
+url: http://127.0.0.1:8000/api/v1/students
 method: GET
 order: 2000
