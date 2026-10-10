@@ -19,7 +19,7 @@ class AcademicController extends Controller
     {
         $this->authorize('viewAny', Course::class);
 
-        return $this->collection(Course::query(), $request, ['course_code', 'course_title', 'units'], ['course_code', 'course_title'], ['status']);
+        return $this->collection(Course::query(), $request, ['course_code', 'course_title', 'units', 'created_at', 'updated_at'], ['course_code', 'course_title'], ['status']);
     }
 
     public function storeCourse(Request $request): JsonResponse
@@ -68,7 +68,7 @@ class AcademicController extends Controller
     {
         $this->authorize('viewAny', AcademicTerm::class);
 
-        return $this->collection(AcademicTerm::query(), $request, ['academic_year', 'semester', 'status'], ['academic_year', 'semester'], ['academic_year', 'semester', 'status']);
+        return $this->collection(AcademicTerm::query(), $request, ['academic_year', 'semester', 'status', 'created_at', 'updated_at'], ['academic_year', 'semester'], ['academic_year', 'semester', 'status']);
     }
 
     public function storeTerm(Request $request): JsonResponse
@@ -129,7 +129,7 @@ class AcademicController extends Controller
             abort_unless($user->isManagement(), 403, 'You are not authorized to list course offerings.');
         }
 
-        return $this->collection($query, $request, ['section', 'status'], ['section'], ['course_id', 'academic_term_id', 'instructor_id', 'status']);
+        return $this->collection($query, $request, ['section', 'status', 'created_at', 'updated_at'], ['section'], ['course_id', 'academic_term_id', 'instructor_id', 'status']);
     }
 
     public function storeOffering(Request $request): JsonResponse
@@ -158,7 +158,7 @@ class AcademicController extends Controller
     public function offeringStudents(Request $request, CourseOffering $courseOffering): JsonResponse
     {
         $this->authorize('viewRoster', $courseOffering);
-        return $this->collection($courseOffering->enrollments()->with('student'), $request, ['id', 'enrollment_date', 'status'], [], ['status']);
+        return $this->collection($courseOffering->enrollments()->with('student'), $request, ['id', 'enrollment_date', 'status', 'created_at', 'updated_at'], [], ['status']);
     }
 
     public function updateOffering(Request $request, CourseOffering $courseOffering): JsonResponse
@@ -201,7 +201,7 @@ class AcademicController extends Controller
             abort_unless($user->isManagement(), 403, 'You are not authorized to list enrollments.');
         }
 
-        return $this->collection($query, $request, ['status', 'enrollment_date'], ['status'], ['student_id', 'course_offering_id', 'status']);
+        return $this->collection($query, $request, ['status', 'enrollment_date', 'created_at', 'updated_at'], ['status'], ['student_id', 'course_offering_id', 'status']);
     }
 
     public function storeEnrollment(Request $request): JsonResponse
@@ -238,7 +238,7 @@ class AcademicController extends Controller
     public function studentEnrollments(Student $student): JsonResponse
     {
         $this->authorize('view', $student);
-        return $this->collection($student->enrollments()->with(['courseOffering.course', 'courseOffering.academicTerm', 'grade']), request(), ['enrollment_date', 'status']);
+        return $this->collection($student->enrollments()->with(['courseOffering.course', 'courseOffering.academicTerm', 'grade']), request(), ['enrollment_date', 'status', 'created_at', 'updated_at']);
     }
 
     public function updateEnrollment(Request $request, Enrollment $enrollment): JsonResponse
@@ -271,7 +271,7 @@ class AcademicController extends Controller
             abort_unless($user->isManagement(), 403, 'You are not authorized to list grades.');
         }
 
-        return $this->collection($query, $request, ['created_at'], ['remarks'], ['enrollment_id']);
+        return $this->collection($query, $request, ['created_at', 'updated_at'], ['remarks'], ['enrollment_id']);
     }
 
     public function storeGrade(Request $request): JsonResponse
@@ -309,7 +309,7 @@ class AcademicController extends Controller
     public function studentGrades(Student $student): JsonResponse
     {
         $this->authorize('view', $student);
-        return $this->collection($student->enrollments()->whereHas('grade')->with(['grade', 'courseOffering.course', 'courseOffering.academicTerm']), request(), ['created_at']);
+        return $this->collection($student->enrollments()->whereHas('grade')->with(['grade', 'courseOffering.course', 'courseOffering.academicTerm']), request(), ['created_at', 'updated_at']);
     }
 
     public function studentAcademicRecord(Student $student): JsonResponse
@@ -345,12 +345,14 @@ class AcademicController extends Controller
             }
         }
 
-        $sort = $request->string('sort', $sortable[0])->toString();
+        $sort = $request->string('sort', '-updated_at')->toString();
         $direction = str_starts_with($sort, '-') ? 'desc' : 'asc';
         $sort = ltrim($sort, '-');
         abort_unless(in_array($sort, $sortable, true), 422, 'Invalid sort field.');
 
-        $items = $query->orderBy($sort, $direction)->paginate(min(max($request->integer('per_page', 20), 1), 100));
+        $items = $query->orderBy($sort, $direction)
+            ->when($sort === 'updated_at' && $direction === 'desc', fn ($builder) => $builder->orderByDesc('id'))
+            ->paginate(min(max($request->integer('per_page', 20), 1), 100));
         return response()->json([
             'success' => true,
             'message' => 'Records retrieved successfully.',

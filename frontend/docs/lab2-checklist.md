@@ -22,14 +22,14 @@ Status checked 2026-10-08 against the lab PDF, frontend source, automated tests,
 ## Required Modules
 
 - [x] Dashboard loads real role-appropriate API counts.
-- [x] Students: list five records per page, create, edit, deactivate, academic record, search, program/year/status filters, sort, and backend-driven pagination. Compact icon actions keep rows short on narrow screens.
-- [x] Programs: list and authorized create/edit/deactivate.
-- [x] Courses: list and authorized create/edit/deactivate.
-- [x] Academic Terms: list and authorized create/edit/deactivate.
-- [x] Course Offerings: list/manage for managers; assigned offering and roster views for instructors. Instructor options come from API responses, not hardcoded IDs.
-- [x] Enrollments: manager create/status changes; instructor assigned enrollments; student self-only list.
-- [x] Grades: authorized create/edit and role-scoped viewing.
-- [x] Academic Record: readable term-grouped display from the backend aggregate endpoint.
+- [x] Students: list five records per page, create/edit/details/academic-record dialogs, deactivate, search, program/year/status filters, sort, and backend-driven pagination. Compact icon actions keep rows short on narrow screens.
+- [x] Programs: list and authorized create/edit/detail dialogs; deactivate.
+- [x] Courses: list and authorized create/edit/detail dialogs; deactivate.
+- [x] Academic Terms: list and authorized create/edit/detail dialogs; deactivate.
+- [x] Course Offerings: list/manage for managers; offering details and roster dialogs for instructors. Instructor options come from API responses, not hardcoded IDs.
+- [x] Enrollments: manager create/status changes in dialogs; instructor assigned enrollments; student self-only list; details dialog.
+- [x] Grades: authorized create/edit/detail dialogs and role-scoped viewing.
+- [x] Academic Record: readable term-grouped dialog from the backend aggregate endpoint.
 - [x] Profile displays authenticated identity and role.
 - [x] Resource lists expose backend-backed search/filter/sort/pagination using each endpoint's supported query parameters; Students additionally has the required program/year/status filters.
 
@@ -40,12 +40,14 @@ Status checked 2026-10-08 against the lab PDF, frontend source, automated tests,
 - [x] Duplicate/conflict and authorization responses are retained by the shared API error type and shown to the user.
 - [x] Network failures have a controlled message; dashboard offers retry.
 - [x] Destructive actions request confirmation.
+- [x] Create/edit forms, record details, academic records, and course rosters open in modal dialogs over the current page with a blurred backdrop; direct navigation/refresh still works.
+- [x] List search refreshes as the user types; after a successful create, edit, or status change, the list refreshes with filters cleared and recently updated records first.
 - [x] Student academic record was checked at a 390px viewport; document width matched viewport after the responsive table fix.
 - [~] Keyboard focus styling and semantic form labels exist, but a formal accessibility audit/test has not been run.
 
 ## Tests and Evidence
 
-- [x] `npm test`: 2 test files passed, 9 tests passed. Covers API headers, 401/422/network handling, login/logout, role-protected routes, and server-driven student pagination.
+- [x] `npm test`: 2 test files passed, 10 tests passed. Covers API headers, 401/422/network handling, login/logout, role-protected routes, modal create/detail workflows, and server-driven student pagination.
 - [x] `npm run build` completed successfully.
 - [x] Live browser verification: administrator dashboard and seeded counts; student role navigation/self-only list; direct management-route denial; student academic record.
 - [~] Capture and save screenshots of major modules, validation/forbidden states, and desktop/mobile views for submission.

@@ -1,33 +1,64 @@
-import { useEffect, useState } from 'react';
-import { Navigate, NavLink, Route, Routes, useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { ArrowRight, BookOpen, ClipboardList, FileText, GraduationCap, Layers3, Menu, Pencil, Plus, Search, UserX, X } from 'lucide-react';
 import apiRequest from './api.js';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import { AuthProvider, useAuth } from './context/AuthContext.jsx';
+import { CourseOfferingRosterPage, ResourceDetailPage, ResourceFormPage, StudentAcademicRecordPage } from './ResourcePages.jsx';
 
 const MANAGEMENT_ROLES = ['administrator', 'registrar', 'staff'];
 const ACADEMIC_ROLES = [...MANAGEMENT_ROLES, 'instructor'];
 const AUTHENTICATED_ROLES = [...ACADEMIC_ROLES, 'student'];
 const STUDENT_PAGE_SIZE = 5;
 
+function backgroundRouteState(location) {
+  return { state: { backgroundLocation: location.state?.backgroundLocation || location } };
+}
+
+function refreshListRoute(navigate, location, notice) {
+  navigate(location.pathname, {
+    replace: true,
+    state: { notice, refreshList: `${Date.now()}-${Math.random()}` },
+  });
+}
+
+function useListRefresh(location, resetList) {
+  const [refreshToken, setRefreshToken] = useState(0);
+  const resetListRef = useRef(resetList);
+  const handledRefreshRef = useRef(null);
+  resetListRef.current = resetList;
+
+  useEffect(() => {
+    const refreshId = location.state?.refreshList;
+    if (!refreshId || refreshId === handledRefreshRef.current) return;
+    handledRefreshRef.current = refreshId;
+    resetListRef.current();
+    setRefreshToken((current) => current + 1);
+  }, [location.key]);
+
+  return refreshToken;
+}
+
 function ModuleHeading({ title, description, action }) {
+  const location = useLocation();
   return (
-    <header className="module-heading">
-      <div>
-        <h2>{title}</h2>
-        {description && <p>{description}</p>}
-      </div>
-      {action}
-    </header>
+    <>
+      <header className="module-heading">
+        <div>
+          <h2>{title}</h2>
+          {description && <p>{description}</p>}
+        </div>
+        {action}
+      </header>
+      {location.state?.notice && <div className="alert success" role="status">{location.state.notice}</div>}
+    </>
   );
 }
 
-function FormToggle({ open, onClick, addLabel, closeLabel = 'Close form' }) {
+function CreateLink({ to, label }) {
+  const location = useLocation();
   return (
-    <button className={open ? 'ghost-btn' : 'primary-btn'} type="button" onClick={onClick} aria-expanded={open}>
-      {open ? <X size={16} aria-hidden="true" /> : <Plus size={16} aria-hidden="true" />}
-      <span>{open ? closeLabel : addLabel}</span>
-    </button>
+    <NavLink className="primary-btn" to={to} {...backgroundRouteState(location)}><Plus size={16} aria-hidden="true" /><span>{label}</span></NavLink>
   );
 }
 
@@ -43,6 +74,19 @@ function CollectionControls({
   onFilterChange,
   onReset,
 }) {
+  const searchHandler = useRef(onSearch);
+  const skipInitialSearch = useRef(true);
+  searchHandler.current = onSearch;
+
+  useEffect(() => {
+    if (skipInitialSearch.current) {
+      skipInitialSearch.current = false;
+      return undefined;
+    }
+    const timer = window.setTimeout(() => searchHandler.current(), 300);
+    return () => window.clearTimeout(timer);
+  }, [searchValue]);
+
   return (
     <section className="collection-tools" aria-label={`${id} list controls`}>
       <form className="search-row" onSubmit={(event) => { event.preventDefault(); onSearch(); }}>
@@ -417,6 +461,8 @@ function DashboardPage() {
 }
 
 function ProgramPage() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [programs, setPrograms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -424,12 +470,19 @@ function ProgramPage() {
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
-  const [sort, setSort] = useState('name');
+  const [sort, setSort] = useState('-updated_at');
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({});
   const [form, setForm] = useState({ code: '', name: '', description: '', status: 'active' });
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('success');
+  const refreshToken = useListRefresh(location, () => {
+    setSearchInput('');
+    setSearch('');
+    setStatus('');
+    setSort('-updated_at');
+    setPage(1);
+  });
 
   const resetForm = () => {
     setForm({ code: '', name: '', description: '', status: 'active' });
@@ -456,7 +509,7 @@ function ProgramPage() {
 
   useEffect(() => {
     loadPrograms();
-  }, [page, search, sort, status]);
+  }, [page, search, sort, status, refreshToken]);
 
   const applySearch = () => {
     setPage(1);
@@ -467,7 +520,7 @@ function ProgramPage() {
     setSearchInput('');
     setSearch('');
     setStatus('');
-    setSort('name');
+    setSort('-updated_at');
     setPage(1);
   };
 
@@ -498,14 +551,7 @@ function ProgramPage() {
   };
 
   const handleEdit = (program) => {
-    setEditingId(program.id);
-    setIsFormOpen(true);
-    setForm({
-      code: program.code,
-      name: program.name,
-      description: program.description || '',
-      status: program.status,
-    });
+    navigate(`/programs/${program.id}/edit`, backgroundRouteState(location));
   };
 
   const handleDelete = async (id) => {
@@ -515,9 +561,7 @@ function ProgramPage() {
 
     try {
       await apiRequest(`/programs/${id}`, { method: 'DELETE' });
-      setMessage('Program deactivated successfully.');
-      setMessageType('success');
-      await loadPrograms();
+      refreshListRoute(navigate, location, 'Program deactivated successfully.');
     } catch (error) {
       setMessage(error.message);
       setMessageType('error');
@@ -529,7 +573,7 @@ function ProgramPage() {
       <ModuleHeading
         title="Programs"
         description={`${meta.total || 0} academic programs`}
-        action={<FormToggle open={isFormOpen || Boolean(editingId)} onClick={() => (isFormOpen ? resetForm() : setIsFormOpen(true))} addLabel="Add program" closeLabel="Close form" />}
+        action={<CreateLink to="/programs/new" label="Add program" />}
       />
       {message && <div className={`alert ${messageType}`} role={messageType === 'error' ? 'alert' : 'status'}>{message}</div>}
       {(isFormOpen || editingId) && <div className="form-panel management-form">
@@ -572,7 +616,7 @@ function ProgramPage() {
         onSearchValueChange={setSearchInput}
         onSearch={applySearch}
         sortValue={sort}
-        sortOptions={[{ value: 'name', label: 'Name, A-Z' }, { value: '-name', label: 'Name, Z-A' }, { value: 'code', label: 'Code' }, { value: 'created_at', label: 'Recently added' }]}
+        sortOptions={[{ value: '-updated_at', label: 'Recently updated' }, { value: 'name', label: 'Name, A-Z' }, { value: '-name', label: 'Name, Z-A' }, { value: 'code', label: 'Code' }]}
         onSortChange={(value) => { setSort(value); setPage(1); }}
         filters={[{ key: 'status', label: 'Status', value: status, options: [{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }] }]}
         onFilterChange={(key, value) => { if (key === 'status') setStatus(value); setPage(1); }}
@@ -600,6 +644,7 @@ function ProgramPage() {
                   <td><StatusLabel>{program.status}</StatusLabel></td>
                   <td>
                     <div className="action-row">
+                      <NavLink className="ghost-btn" to={`/programs/${program.id}`} {...backgroundRouteState(location)}>View</NavLink>
                       <button type="button" className="secondary-btn" onClick={() => handleEdit(program)}>Edit</button>
                       <button type="button" className="danger-btn" onClick={() => handleDelete(program.id)}>Delete</button>
                     </div>
@@ -618,6 +663,8 @@ function ProgramPage() {
 }
 
 function StudentPage() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const canManage = MANAGEMENT_ROLES.includes(user?.role);
   const [students, setStudents] = useState([]);
@@ -630,7 +677,7 @@ function StudentPage() {
   const [recordLoading, setRecordLoading] = useState(false);
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
-  const [sort, setSort] = useState('last_name');
+  const [sort, setSort] = useState('-updated_at');
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({ current_page: 1, last_page: 1, total: 0, per_page: STUDENT_PAGE_SIZE });
   const [fieldErrors, setFieldErrors] = useState({});
@@ -646,6 +693,13 @@ function StudentPage() {
   });
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('success');
+  const refreshToken = useListRefresh(location, () => {
+    setSearchInput('');
+    setSearch('');
+    setSort('-updated_at');
+    setPage(1);
+    setFilters({ programId: '', yearLevel: '', status: '' });
+  });
 
   const resetForm = () => {
     setForm({
@@ -690,7 +744,15 @@ function StudentPage() {
 
   useEffect(() => {
     loadData();
-  }, [filters.programId, filters.yearLevel, filters.status, page, search, sort]);
+  }, [filters.programId, filters.yearLevel, filters.status, page, search, sort, refreshToken]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setPage(1);
+      setSearch(searchInput.trim());
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [searchInput]);
 
   const handleSearch = (event) => {
     event.preventDefault();
@@ -736,19 +798,7 @@ function StudentPage() {
   };
 
   const handleEdit = (student) => {
-    setEditingId(student.id);
-    setIsFormOpen(true);
-    setForm({
-      student_number: student.student_number,
-      first_name: student.first_name,
-      last_name: student.last_name,
-      email: student.email || '',
-      program_id: String(student.program_id || student.program?.id || ''),
-      year_level: String(student.year_level || 1),
-      status: student.status || 'active',
-    });
-    setFieldErrors({});
-    setSelectedRecord(null);
+    navigate(`/students/${student.id}/edit`, backgroundRouteState(location));
   };
 
   const handleDelete = async (id) => {
@@ -756,9 +806,7 @@ function StudentPage() {
 
     try {
       await apiRequest(`/students/${id}`, { method: 'DELETE' });
-      setMessage('Student deactivated successfully.');
-      setMessageType('success');
-      await loadData();
+      refreshListRoute(navigate, location, 'Student deactivated successfully.');
     } catch (error) {
       setMessage(error.message);
       setMessageType('error');
@@ -766,16 +814,7 @@ function StudentPage() {
   };
 
   const viewAcademicRecord = async (student) => {
-    setRecordLoading(true);
-    try {
-      const response = await apiRequest(`/students/${student.id}/academic-record`);
-      setSelectedRecord(response.data);
-    } catch (error) {
-      setMessage(error.message);
-      setMessageType('error');
-    } finally {
-      setRecordLoading(false);
-    }
+    navigate(`/students/${student.id}/academic-record`, backgroundRouteState(location));
   };
 
   return (
@@ -783,7 +822,7 @@ function StudentPage() {
       <ModuleHeading
         title="Students"
         description={canManage ? 'Search, filter, and maintain student records.' : 'Your profile and academic record.'}
-        action={canManage && <FormToggle open={isFormOpen || Boolean(editingId)} onClick={() => (isFormOpen ? resetForm() : setIsFormOpen(true))} addLabel="Add student" closeLabel="Close form" />}
+        action={canManage && <CreateLink to="/students/new" label="Add student" />}
       />
       {message && <div className={`alert ${messageType}`} role={messageType === 'error' ? 'alert' : 'status'}>{message}</div>}
       {canManage && (isFormOpen || editingId) && <div className="form-panel management-form">
@@ -824,10 +863,11 @@ function StudentPage() {
             <div className="field">
               <label>Year Level</label>
               <select value={form.year_level} onChange={(e) => setForm({ ...form, year_level: e.target.value })}>
-                {[1, 2, 3, 4, 5, 6, 7, 8].map((level) => (
+                {[1, 2, 3, 4, 5, 6].map((level) => (
                   <option key={level} value={level}>{level}</option>
                 ))}
               </select>
+              <span className="field-help">Program lengths vary; approved extensions may reach year 6.</span>
               {fieldErrors.year_level?.map((error) => <span className="field-error" key={error}>{error}</span>)}
             </div>
             <div className="field">
@@ -859,10 +899,11 @@ function StudentPage() {
           <label className="field sort-field" htmlFor="student-sort">
             <span>Sort by</span>
             <select id="student-sort" value={sort} onChange={(event) => { setSort(event.target.value); setPage(1); }}>
+              <option value="-updated_at">Recently updated</option>
               <option value="last_name">Last name, A-Z</option>
               <option value="-last_name">Last name, Z-A</option>
               <option value="student_number">Student number</option>
-              <option value="created_at">Recently added</option>
+              <option value="-created_at">Recently added</option>
             </select>
           </label>
         </form>
@@ -880,7 +921,7 @@ function StudentPage() {
             <label htmlFor="year-filter">Year Level</label>
             <select id="year-filter" value={filters.yearLevel} onChange={(e) => { setFilters({ ...filters, yearLevel: e.target.value }); setPage(1); }}>
               <option value="">All Levels</option>
-              {[1, 2, 3, 4, 5, 6, 7, 8].map((level) => (
+              {[1, 2, 3, 4, 5, 6].map((level) => (
                 <option key={level} value={level}>{level}</option>
               ))}
             </select>
@@ -927,7 +968,8 @@ function StudentPage() {
                           <Pencil size={15} aria-hidden="true" />
                         </button>
                       )}
-                      <button type="button" className="icon-action" onClick={() => viewAcademicRecord(student)} disabled={recordLoading} title="View academic record" aria-label={`View academic record for ${student.first_name} ${student.last_name}`}>
+                      <NavLink className="icon-action" to={`/students/${student.id}`} {...backgroundRouteState(location)} title="View student details" aria-label={`View details for ${student.first_name} ${student.last_name}`}><Search size={15} aria-hidden="true" /></NavLink>
+                      <button type="button" className="icon-action" onClick={() => viewAcademicRecord(student)} title="View academic record" aria-label={`View academic record for ${student.first_name} ${student.last_name}`}>
                         <FileText size={15} aria-hidden="true" />
                       </button>
                       {canManage && (
@@ -991,6 +1033,8 @@ function StudentPage() {
 }
 
 function CoursePage() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -998,12 +1042,19 @@ function CoursePage() {
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
-  const [sort, setSort] = useState('course_title');
+  const [sort, setSort] = useState('-updated_at');
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({});
   const [form, setForm] = useState({ course_code: '', course_title: '', description: '', units: 3, status: 'active' });
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('success');
+  const refreshToken = useListRefresh(location, () => {
+    setSearchInput('');
+    setSearch('');
+    setStatus('');
+    setSort('-updated_at');
+    setPage(1);
+  });
 
   const resetForm = () => {
     setForm({ course_code: '', course_title: '', description: '', units: 3, status: 'active' });
@@ -1030,13 +1081,13 @@ function CoursePage() {
 
   useEffect(() => {
     loadCourses();
-  }, [page, search, sort, status]);
+  }, [page, search, sort, status, refreshToken]);
 
   const resetControls = () => {
     setSearchInput('');
     setSearch('');
     setStatus('');
-    setSort('course_title');
+    setSort('-updated_at');
     setPage(1);
   };
 
@@ -1061,24 +1112,14 @@ function CoursePage() {
   };
 
   const handleEdit = (course) => {
-    setEditingId(course.id);
-    setIsFormOpen(true);
-    setForm({
-      course_code: course.course_code,
-      course_title: course.course_title,
-      description: course.description || '',
-      units: course.units || 3,
-      status: course.status || 'active',
-    });
+    navigate(`/courses/${course.id}/edit`, backgroundRouteState(location));
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm('Deactivate this course?')) return;
     try {
       await apiRequest(`/courses/${id}`, { method: 'DELETE' });
-      setMessage('Course deactivated successfully.');
-      setMessageType('success');
-      await loadCourses();
+      refreshListRoute(navigate, location, 'Course deactivated successfully.');
     } catch (error) {
       setMessage(error.message);
       setMessageType('error');
@@ -1090,7 +1131,7 @@ function CoursePage() {
       <ModuleHeading
         title="Courses"
         description={`${meta.total || 0} courses in the catalog`}
-        action={<FormToggle open={isFormOpen || Boolean(editingId)} onClick={() => (isFormOpen ? resetForm() : setIsFormOpen(true))} addLabel="Add course" closeLabel="Close form" />}
+        action={<CreateLink to="/courses/new" label="Add course" />}
       />
       {message && <div className={`alert ${messageType}`} role={messageType === 'error' ? 'alert' : 'status'}>{message}</div>}
       {(isFormOpen || editingId) && <div className="form-panel management-form">
@@ -1134,7 +1175,7 @@ function CoursePage() {
         onSearchValueChange={setSearchInput}
         onSearch={() => { setPage(1); setSearch(searchInput.trim()); }}
         sortValue={sort}
-        sortOptions={[{ value: 'course_title', label: 'Title, A-Z' }, { value: '-course_title', label: 'Title, Z-A' }, { value: 'course_code', label: 'Course code' }, { value: 'units', label: 'Units' }]}
+        sortOptions={[{ value: '-updated_at', label: 'Recently updated' }, { value: 'course_title', label: 'Title, A-Z' }, { value: '-course_title', label: 'Title, Z-A' }, { value: 'course_code', label: 'Course code' }, { value: 'units', label: 'Units' }]}
         onSortChange={(value) => { setSort(value); setPage(1); }}
         filters={[{ key: 'status', label: 'Status', value: status, options: [{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }] }]}
         onFilterChange={(key, value) => { if (key === 'status') setStatus(value); setPage(1); }}
@@ -1164,6 +1205,7 @@ function CoursePage() {
                   <td><StatusLabel>{course.status}</StatusLabel></td>
                   <td>
                     <div className="action-row">
+                      <NavLink className="ghost-btn" to={`/courses/${course.id}`} {...backgroundRouteState(location)}>View</NavLink>
                       <button type="button" className="secondary-btn" onClick={() => handleEdit(course)}>Edit</button>
                       <button type="button" className="danger-btn" onClick={() => handleDelete(course.id)}>Delete</button>
                     </div>
@@ -1182,6 +1224,8 @@ function CoursePage() {
 }
 
 function AcademicTermPage() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [terms, setTerms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -1191,12 +1235,21 @@ function AcademicTermPage() {
   const [academicYear, setAcademicYear] = useState('');
   const [semester, setSemester] = useState('');
   const [status, setStatus] = useState('');
-  const [sort, setSort] = useState('academic_year');
+  const [sort, setSort] = useState('-updated_at');
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({});
   const [form, setForm] = useState({ academic_year: '2026-2027', semester: '1st Semester', start_date: '2026-08-01', end_date: '2026-12-20', status: 'active' });
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('success');
+  const refreshToken = useListRefresh(location, () => {
+    setSearchInput('');
+    setSearch('');
+    setAcademicYear('');
+    setSemester('');
+    setStatus('');
+    setSort('-updated_at');
+    setPage(1);
+  });
 
   const loadTerms = async () => {
     setLoading(true);
@@ -1219,7 +1272,7 @@ function AcademicTermPage() {
 
   useEffect(() => {
     loadTerms();
-  }, [page, search, academicYear, semester, status, sort]);
+  }, [page, search, academicYear, semester, status, sort, refreshToken]);
 
   const resetControls = () => {
     setSearchInput('');
@@ -1227,7 +1280,7 @@ function AcademicTermPage() {
     setAcademicYear('');
     setSemester('');
     setStatus('');
-    setSort('academic_year');
+    setSort('-updated_at');
     setPage(1);
   };
 
@@ -1257,24 +1310,14 @@ function AcademicTermPage() {
   };
 
   const handleEdit = (term) => {
-    setEditingId(term.id);
-    setIsFormOpen(true);
-    setForm({
-      academic_year: term.academic_year,
-      semester: term.semester,
-      start_date: term.start_date,
-      end_date: term.end_date,
-      status: term.status,
-    });
+    navigate(`/academic-terms/${term.id}/edit`, backgroundRouteState(location));
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm('Deactivate this academic term?')) return;
     try {
       await apiRequest(`/academic-terms/${id}`, { method: 'DELETE' });
-      setMessage('Academic term deactivated successfully.');
-      setMessageType('success');
-      await loadTerms();
+      refreshListRoute(navigate, location, 'Academic term deactivated successfully.');
     } catch (error) {
       setMessage(error.message);
       setMessageType('error');
@@ -1286,7 +1329,7 @@ function AcademicTermPage() {
       <ModuleHeading
         title="Academic Terms"
         description={`${meta.total || 0} academic terms`}
-        action={<FormToggle open={isFormOpen || Boolean(editingId)} onClick={() => (isFormOpen ? resetForm() : setIsFormOpen(true))} addLabel="Add term" closeLabel="Close form" />}
+        action={<CreateLink to="/academic-terms/new" label="Add term" />}
       />
       {message && <div className={`alert ${messageType}`} role={messageType === 'error' ? 'alert' : 'status'}>{message}</div>}
       {(isFormOpen || editingId) && <div className="form-panel management-form">
@@ -1331,7 +1374,7 @@ function AcademicTermPage() {
         onSearchValueChange={setSearchInput}
         onSearch={() => { setPage(1); setSearch(searchInput.trim()); }}
         sortValue={sort}
-        sortOptions={[{ value: 'academic_year', label: 'Academic year' }, { value: '-academic_year', label: 'Newest year' }, { value: 'semester', label: 'Semester' }, { value: 'status', label: 'Status' }]}
+        sortOptions={[{ value: '-updated_at', label: 'Recently updated' }, { value: 'academic_year', label: 'Academic year' }, { value: '-academic_year', label: 'Newest year' }, { value: 'semester', label: 'Semester' }, { value: 'status', label: 'Status' }]}
         onSortChange={(value) => { setSort(value); setPage(1); }}
         filters={[
           { key: 'academic_year', label: 'Academic year', value: academicYear, options: Array.from(new Set(terms.map((term) => term.academic_year))).map((value) => ({ value, label: value })) },
@@ -1367,6 +1410,7 @@ function AcademicTermPage() {
                   <td><StatusLabel>{term.status}</StatusLabel></td>
                   <td>
                     <div className="action-row">
+                      <NavLink className="ghost-btn" to={`/academic-terms/${term.id}`} {...backgroundRouteState(location)}>View</NavLink>
                       <button type="button" className="secondary-btn" onClick={() => handleEdit(term)}>Edit</button>
                       <button type="button" className="danger-btn" onClick={() => handleDelete(term.id)}>Delete</button>
                     </div>
@@ -1385,6 +1429,8 @@ function AcademicTermPage() {
 }
 
 function CourseOfferingPage() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const canManage = MANAGEMENT_ROLES.includes(user?.role);
   const [offerings, setOfferings] = useState([]);
@@ -1401,7 +1447,7 @@ function CourseOfferingPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [courseFilter, setCourseFilter] = useState('');
   const [termFilter, setTermFilter] = useState('');
-  const [sort, setSort] = useState('section');
+  const [sort, setSort] = useState('-updated_at');
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({});
   const [form, setForm] = useState({
@@ -1416,6 +1462,15 @@ function CourseOfferingPage() {
   });
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('success');
+  const refreshToken = useListRefresh(location, () => {
+    setSearchInput('');
+    setSearch('');
+    setStatusFilter('');
+    setCourseFilter('');
+    setTermFilter('');
+    setSort('-updated_at');
+    setPage(1);
+  });
 
   const loadData = async () => {
     setLoading(true);
@@ -1449,7 +1504,7 @@ function CourseOfferingPage() {
 
   useEffect(() => {
     loadData();
-  }, [page, search, sort, statusFilter, courseFilter, termFilter]);
+  }, [page, search, sort, statusFilter, courseFilter, termFilter, refreshToken]);
 
   const resetControls = () => {
     setSearchInput('');
@@ -1457,7 +1512,7 @@ function CourseOfferingPage() {
     setStatusFilter('');
     setCourseFilter('');
     setTermFilter('');
-    setSort('section');
+    setSort('-updated_at');
     setPage(1);
   };
 
@@ -1515,27 +1570,14 @@ function CourseOfferingPage() {
   };
 
   const handleEdit = (offering) => {
-    setEditingId(offering.id);
-    setIsFormOpen(true);
-    setForm({
-      course_id: String(offering.course_id),
-      academic_term_id: String(offering.academic_term_id),
-      instructor_id: String(offering.instructor_id || 3),
-      section: offering.section,
-      schedule: offering.schedule || '',
-      room: offering.room || '',
-      capacity: offering.capacity || 40,
-      status: offering.status || 'open',
-    });
+    navigate(`/course-offerings/${offering.id}/edit`, backgroundRouteState(location));
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm('Cancel this course offering?')) return;
     try {
       await apiRequest(`/course-offerings/${id}`, { method: 'DELETE' });
-      setMessage('Course offering cancelled successfully.');
-      setMessageType('success');
-      await loadData();
+      refreshListRoute(navigate, location, 'Course offering cancelled successfully.');
     } catch (error) {
       setMessage(error.message);
       setMessageType('error');
@@ -1543,16 +1585,7 @@ function CourseOfferingPage() {
   };
 
   const viewRoster = async (offering) => {
-    setRosterLoading(true);
-    try {
-      const response = await apiRequest(`/course-offerings/${offering.id}/students?per_page=100`);
-      setSelectedRoster({ offering, students: response.data || [] });
-    } catch (error) {
-      setMessage(error.message);
-      setMessageType('error');
-    } finally {
-      setRosterLoading(false);
-    }
+    navigate(`/course-offerings/${offering.id}/roster`, backgroundRouteState(location));
   };
 
   return (
@@ -1560,7 +1593,7 @@ function CourseOfferingPage() {
       <ModuleHeading
         title="Course Offerings"
         description={`${meta.total || 0} sections · review schedules and rosters`}
-        action={canManage && <FormToggle open={isFormOpen || Boolean(editingId)} onClick={() => (isFormOpen || editingId ? resetForm() : setIsFormOpen(true))} addLabel="Add offering" closeLabel="Close form" />}
+        action={canManage && <CreateLink to="/course-offerings/new" label="Add offering" />}
       />
       {message && <div className={`alert ${messageType}`} role={messageType === 'error' ? 'alert' : 'status'}>{message}</div>}
       {canManage && (isFormOpen || editingId) && <div className="form-panel management-form">
@@ -1626,7 +1659,7 @@ function CourseOfferingPage() {
         onSearchValueChange={setSearchInput}
         onSearch={() => { setPage(1); setSearch(searchInput.trim()); }}
         sortValue={sort}
-        sortOptions={[{ value: 'section', label: 'Section' }, { value: 'status', label: 'Status' }]}
+        sortOptions={[{ value: '-updated_at', label: 'Recently updated' }, { value: 'section', label: 'Section' }, { value: 'status', label: 'Status' }]}
         onSortChange={(value) => { setSort(value); setPage(1); }}
         filters={[
           { key: 'course_id', label: 'Course', value: courseFilter, options: courses.map((course) => ({ value: String(course.id), label: `${course.course_code} · ${course.course_title}` })) },
@@ -1664,7 +1697,8 @@ function CourseOfferingPage() {
                   <td><StatusLabel>{offering.status}</StatusLabel></td>
                   <td>
                     <div className="action-row">
-                      <button type="button" className="ghost-btn" onClick={() => viewRoster(offering)} disabled={rosterLoading}>Roster</button>
+                      <NavLink className="ghost-btn" to={`/course-offerings/${offering.id}`} {...backgroundRouteState(location)}>View</NavLink>
+                      <button type="button" className="ghost-btn" onClick={() => viewRoster(offering)}>Roster</button>
                       {canManage && <button type="button" className="secondary-btn" onClick={() => handleEdit(offering)}>Edit</button>}
                       {canManage && <button type="button" className="danger-btn" onClick={() => handleDelete(offering.id)}>Cancel offering</button>}
                     </div>
@@ -1703,6 +1737,8 @@ function CourseOfferingPage() {
 }
 
 function EnrollmentPage() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const canManage = MANAGEMENT_ROLES.includes(user?.role);
   const [enrollments, setEnrollments] = useState([]);
@@ -1715,7 +1751,7 @@ function EnrollmentPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [studentFilter, setStudentFilter] = useState('');
   const [offeringFilter, setOfferingFilter] = useState('');
-  const [sort, setSort] = useState('enrollment_date');
+  const [sort, setSort] = useState('-updated_at');
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({});
   const [form, setForm] = useState({
@@ -1726,6 +1762,15 @@ function EnrollmentPage() {
   });
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('success');
+  const refreshToken = useListRefresh(location, () => {
+    setSearchInput('');
+    setSearch('');
+    setStatusFilter('');
+    setStudentFilter('');
+    setOfferingFilter('');
+    setSort('-updated_at');
+    setPage(1);
+  });
 
   const loadData = async () => {
     setLoading(true);
@@ -1759,7 +1804,7 @@ function EnrollmentPage() {
 
   useEffect(() => {
     loadData();
-  }, [page, search, sort, statusFilter, studentFilter, offeringFilter]);
+  }, [page, search, sort, statusFilter, studentFilter, offeringFilter, refreshToken]);
 
   const resetControls = () => {
     setSearchInput('');
@@ -1767,7 +1812,7 @@ function EnrollmentPage() {
     setStatusFilter('');
     setStudentFilter('');
     setOfferingFilter('');
-    setSort('enrollment_date');
+    setSort('-updated_at');
     setPage(1);
   };
 
@@ -1794,9 +1839,7 @@ function EnrollmentPage() {
   const handleUpdate = async (id, status) => {
     try {
       await apiRequest(`/enrollments/${id}`, { method: 'PATCH', body: { status } });
-      setMessage('Enrollment updated successfully.');
-      setMessageType('success');
-      await loadData();
+      refreshListRoute(navigate, location, 'Enrollment updated successfully.');
     } catch (error) {
       setMessage(error.message);
       setMessageType('error');
@@ -1808,7 +1851,7 @@ function EnrollmentPage() {
       <ModuleHeading
         title="Enrollments"
         description={`${meta.total || 0} registrations · review course and student status`}
-        action={canManage && <FormToggle open={isFormOpen} onClick={() => setIsFormOpen((open) => !open)} addLabel="Enroll student" closeLabel="Close form" />}
+        action={canManage && <CreateLink to="/enrollments/new" label="Enroll student" />}
       />
       {message && <div className={`alert ${messageType}`} role={messageType === 'error' ? 'alert' : 'status'}>{message}</div>}
       {canManage && isFormOpen && <div className="form-panel management-form">
@@ -1852,7 +1895,7 @@ function EnrollmentPage() {
         onSearchValueChange={setSearchInput}
         onSearch={() => { setPage(1); setSearch(searchInput.trim()); }}
         sortValue={sort}
-        sortOptions={[{ value: 'enrollment_date', label: 'Oldest enrollment' }, { value: '-enrollment_date', label: 'Newest enrollment' }, { value: 'status', label: 'Status' }]}
+        sortOptions={[{ value: '-updated_at', label: 'Recently updated' }, { value: 'enrollment_date', label: 'Oldest enrollment' }, { value: '-enrollment_date', label: 'Newest enrollment' }, { value: 'status', label: 'Status' }]}
         onSortChange={(value) => { setSort(value); setPage(1); }}
         filters={[
           ...(canManage ? [{ key: 'student_id', label: 'Student', value: studentFilter, options: students.map((student) => ({ value: String(student.id), label: `${student.student_number} · ${student.first_name} ${student.last_name}` })) }] : []),
@@ -1888,11 +1931,8 @@ function EnrollmentPage() {
                   <td><StatusLabel>{enrollment.status}</StatusLabel></td>
                   <td>
                     <div className="action-row">
-                      {canManage && <>
-                        <button type="button" className="secondary-btn" onClick={() => handleUpdate(enrollment.id, 'enrolled')}>Enroll</button>
-                        <button type="button" className="ghost-btn" onClick={() => handleUpdate(enrollment.id, 'completed')}>Complete</button>
-                        <button type="button" className="danger-btn" onClick={() => handleUpdate(enrollment.id, 'dropped')}>Drop</button>
-                      </>}
+                      <NavLink className="ghost-btn" to={`/enrollments/${enrollment.id}`} {...backgroundRouteState(location)}>View</NavLink>
+                      {canManage && <NavLink className="secondary-btn" to={`/enrollments/${enrollment.id}/edit`} {...backgroundRouteState(location)}>Update</NavLink>}
                     </div>
                   </td>
                 </tr>
@@ -1909,6 +1949,8 @@ function EnrollmentPage() {
 }
 
 function GradePage() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const canManage = MANAGEMENT_ROLES.includes(user?.role);
   const canGrade = canManage || user?.role === 'instructor';
@@ -1920,12 +1962,19 @@ function GradePage() {
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [enrollmentFilter, setEnrollmentFilter] = useState('');
-  const [sort, setSort] = useState('-created_at');
+  const [sort, setSort] = useState('-updated_at');
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({});
   const [form, setForm] = useState({ enrollment_id: '', midterm_grade: '', final_grade: '', remarks: '' });
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('success');
+  const refreshToken = useListRefresh(location, () => {
+    setSearchInput('');
+    setSearch('');
+    setEnrollmentFilter('');
+    setSort('-updated_at');
+    setPage(1);
+  });
 
   const loadData = async () => {
     setLoading(true);
@@ -1950,13 +1999,13 @@ function GradePage() {
 
   useEffect(() => {
     loadData();
-  }, [page, search, sort, enrollmentFilter]);
+  }, [page, search, sort, enrollmentFilter, refreshToken]);
 
   const resetControls = () => {
     setSearchInput('');
     setSearch('');
     setEnrollmentFilter('');
-    setSort('-created_at');
+    setSort('-updated_at');
     setPage(1);
   };
 
@@ -1989,14 +2038,7 @@ function GradePage() {
   };
 
   const handleEdit = (grade) => {
-    setEditingGradeId(grade.id);
-    setIsFormOpen(true);
-    setForm({
-      enrollment_id: String(grade.enrollment_id),
-      midterm_grade: grade.midterm_grade ?? '',
-      final_grade: grade.final_grade ?? '',
-      remarks: grade.remarks || '',
-    });
+    navigate(`/grades/${grade.id}/edit`, backgroundRouteState(location));
   };
 
   return (
@@ -2004,7 +2046,7 @@ function GradePage() {
       <ModuleHeading
         title="Grades"
         description={`${meta.total || 0} grade records · authorized users can record or update results`}
-        action={canGrade && <FormToggle open={isFormOpen || Boolean(editingGradeId)} onClick={() => { setIsFormOpen((open) => !open); setEditingGradeId(null); if (editingGradeId) setForm({ enrollment_id: '', midterm_grade: '', final_grade: '', remarks: '' }); }} addLabel="Record grade" closeLabel="Close form" />}
+        action={canGrade && <CreateLink to="/grades/new" label="Record grade" />}
       />
       {message && <div className={`alert ${messageType}`} role={messageType === 'error' ? 'alert' : 'status'}>{message}</div>}
       {canGrade && (isFormOpen || editingGradeId) && <div className="form-panel management-form">
@@ -2048,7 +2090,7 @@ function GradePage() {
         onSearchValueChange={setSearchInput}
         onSearch={() => { setPage(1); setSearch(searchInput.trim()); }}
         sortValue={sort}
-        sortOptions={[{ value: '-created_at', label: 'Newest first' }, { value: 'created_at', label: 'Oldest first' }]}
+        sortOptions={[{ value: '-updated_at', label: 'Recently updated' }, { value: '-created_at', label: 'Newest created' }, { value: 'created_at', label: 'Oldest created' }]}
         onSortChange={(value) => { setSort(value); setPage(1); }}
         filters={[{ key: 'enrollment_id', label: 'Enrollment', value: enrollmentFilter, options: enrollments.map((enrollment) => ({ value: String(enrollment.id), label: `${enrollment.student?.student_number || enrollment.student?.id} · ${enrollment.course_offering?.course?.course_code || 'Course'} ${enrollment.course_offering?.section || ''}` })) }]}
         onFilterChange={(key, value) => { if (key === 'enrollment_id') setEnrollmentFilter(value); setPage(1); }}
@@ -2078,7 +2120,12 @@ function GradePage() {
                   <td>{grade.midterm_grade ?? '-'}</td>
                   <td>{grade.final_grade ?? '-'}</td>
                   <td>{grade.remarks || '-'}</td>
-                  <td>{canGrade && <button type="button" className="secondary-btn" onClick={() => handleEdit(grade)}>Edit grade</button>}</td>
+                  <td>
+                    <div className="action-row">
+                      <NavLink className="ghost-btn" to={`/grades/${grade.id}`} {...backgroundRouteState(location)}>View</NavLink>
+                      {canGrade && <button type="button" className="secondary-btn" onClick={() => handleEdit(grade)}>Edit grade</button>}
+                    </div>
+                  </td>
                 </tr>
               ))
             ) : (
@@ -2120,11 +2167,35 @@ function ProfilePage() {
   );
 }
 
-function ProtectedPage({ children, allowedRoles = AUTHENTICATED_ROLES }) {
+function ProtectedScreen({ children, allowedRoles = AUTHENTICATED_ROLES }) {
   return (
     <ProtectedRoute allowedRoles={allowedRoles}>
-      <DashboardLayout>{children}</DashboardLayout>
+      {children}
     </ProtectedRoute>
+  );
+}
+
+function ProtectedPage({ children, allowedRoles = AUTHENTICATED_ROLES }) {
+  return (
+    <ProtectedScreen allowedRoles={allowedRoles}>
+      <DashboardLayout>{children}</DashboardLayout>
+    </ProtectedScreen>
+  );
+}
+
+function ModalRoute({ children }) {
+  const navigate = useNavigate();
+  return (
+    <div className="workflow-backdrop" onMouseDown={(event) => {
+      if (event.target === event.currentTarget) navigate(-1);
+    }}>
+      <section className="workflow-dialog" role="dialog" aria-modal="true" aria-label="Record workflow">
+        <button className="workflow-dialog-close" type="button" onClick={() => navigate(-1)} aria-label="Close dialog">
+          <X size={20} aria-hidden="true" />
+        </button>
+        {children}
+      </section>
+    </div>
   );
 }
 
@@ -2139,21 +2210,75 @@ function NotFoundPage() {
 }
 
 function AppContent() {
+  const location = useLocation();
+  const backgroundLocation = location.state?.backgroundLocation;
   return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/" element={<LandingPage />} />
-      <Route path="/dashboard" element={<ProtectedPage><DashboardPage /></ProtectedPage>} />
-      <Route path="/students" element={<ProtectedPage allowedRoles={[...MANAGEMENT_ROLES, 'student']}><StudentPage /></ProtectedPage>} />
-      <Route path="/programs" element={<ProtectedPage allowedRoles={MANAGEMENT_ROLES}><ProgramPage /></ProtectedPage>} />
-      <Route path="/courses" element={<ProtectedPage allowedRoles={MANAGEMENT_ROLES}><CoursePage /></ProtectedPage>} />
-      <Route path="/academic-terms" element={<ProtectedPage allowedRoles={MANAGEMENT_ROLES}><AcademicTermPage /></ProtectedPage>} />
-      <Route path="/course-offerings" element={<ProtectedPage allowedRoles={ACADEMIC_ROLES}><CourseOfferingPage /></ProtectedPage>} />
-      <Route path="/enrollments" element={<ProtectedPage><EnrollmentPage /></ProtectedPage>} />
-      <Route path="/grades" element={<ProtectedPage><GradePage /></ProtectedPage>} />
-      <Route path="/profile" element={<ProtectedPage><ProfilePage /></ProtectedPage>} />
-      <Route path="*" element={<NotFoundPage />} />
-    </Routes>
+    <>
+      <Routes location={backgroundLocation || location}>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/dashboard" element={<ProtectedPage><DashboardPage /></ProtectedPage>} />
+        <Route path="/students" element={<ProtectedPage allowedRoles={[...MANAGEMENT_ROLES, 'student']}><StudentPage /></ProtectedPage>} />
+        <Route path="/students/new" element={<ProtectedPage allowedRoles={MANAGEMENT_ROLES}><ResourceFormPage resource="students" /></ProtectedPage>} />
+        <Route path="/students/:id/edit" element={<ProtectedPage allowedRoles={MANAGEMENT_ROLES}><ResourceFormPage resource="students" /></ProtectedPage>} />
+        <Route path="/students/:id/academic-record" element={<ProtectedPage allowedRoles={[...MANAGEMENT_ROLES, 'student']}><StudentAcademicRecordPage /></ProtectedPage>} />
+        <Route path="/students/:id" element={<ProtectedPage allowedRoles={[...MANAGEMENT_ROLES, 'student']}><ResourceDetailPage resource="students" /></ProtectedPage>} />
+        <Route path="/programs" element={<ProtectedPage allowedRoles={MANAGEMENT_ROLES}><ProgramPage /></ProtectedPage>} />
+        <Route path="/programs/new" element={<ProtectedPage allowedRoles={MANAGEMENT_ROLES}><ResourceFormPage resource="programs" /></ProtectedPage>} />
+        <Route path="/programs/:id/edit" element={<ProtectedPage allowedRoles={MANAGEMENT_ROLES}><ResourceFormPage resource="programs" /></ProtectedPage>} />
+        <Route path="/programs/:id" element={<ProtectedPage allowedRoles={MANAGEMENT_ROLES}><ResourceDetailPage resource="programs" /></ProtectedPage>} />
+        <Route path="/courses" element={<ProtectedPage allowedRoles={MANAGEMENT_ROLES}><CoursePage /></ProtectedPage>} />
+        <Route path="/courses/new" element={<ProtectedPage allowedRoles={MANAGEMENT_ROLES}><ResourceFormPage resource="courses" /></ProtectedPage>} />
+        <Route path="/courses/:id/edit" element={<ProtectedPage allowedRoles={MANAGEMENT_ROLES}><ResourceFormPage resource="courses" /></ProtectedPage>} />
+        <Route path="/courses/:id" element={<ProtectedPage allowedRoles={MANAGEMENT_ROLES}><ResourceDetailPage resource="courses" /></ProtectedPage>} />
+        <Route path="/academic-terms" element={<ProtectedPage allowedRoles={MANAGEMENT_ROLES}><AcademicTermPage /></ProtectedPage>} />
+        <Route path="/academic-terms/new" element={<ProtectedPage allowedRoles={MANAGEMENT_ROLES}><ResourceFormPage resource="academic-terms" /></ProtectedPage>} />
+        <Route path="/academic-terms/:id/edit" element={<ProtectedPage allowedRoles={MANAGEMENT_ROLES}><ResourceFormPage resource="academic-terms" /></ProtectedPage>} />
+        <Route path="/academic-terms/:id" element={<ProtectedPage allowedRoles={MANAGEMENT_ROLES}><ResourceDetailPage resource="academic-terms" /></ProtectedPage>} />
+        <Route path="/course-offerings" element={<ProtectedPage allowedRoles={ACADEMIC_ROLES}><CourseOfferingPage /></ProtectedPage>} />
+        <Route path="/course-offerings/new" element={<ProtectedPage allowedRoles={MANAGEMENT_ROLES}><ResourceFormPage resource="course-offerings" /></ProtectedPage>} />
+        <Route path="/course-offerings/:id/edit" element={<ProtectedPage allowedRoles={MANAGEMENT_ROLES}><ResourceFormPage resource="course-offerings" /></ProtectedPage>} />
+        <Route path="/course-offerings/:id/roster" element={<ProtectedPage allowedRoles={ACADEMIC_ROLES}><CourseOfferingRosterPage /></ProtectedPage>} />
+        <Route path="/course-offerings/:id" element={<ProtectedPage allowedRoles={ACADEMIC_ROLES}><ResourceDetailPage resource="course-offerings" /></ProtectedPage>} />
+        <Route path="/enrollments" element={<ProtectedPage><EnrollmentPage /></ProtectedPage>} />
+        <Route path="/enrollments/new" element={<ProtectedPage allowedRoles={MANAGEMENT_ROLES}><ResourceFormPage resource="enrollments" /></ProtectedPage>} />
+        <Route path="/enrollments/:id/edit" element={<ProtectedPage allowedRoles={MANAGEMENT_ROLES}><ResourceFormPage resource="enrollments" /></ProtectedPage>} />
+        <Route path="/enrollments/:id" element={<ProtectedPage><ResourceDetailPage resource="enrollments" /></ProtectedPage>} />
+        <Route path="/grades" element={<ProtectedPage><GradePage /></ProtectedPage>} />
+        <Route path="/grades/new" element={<ProtectedPage allowedRoles={ACADEMIC_ROLES}><ResourceFormPage resource="grades" /></ProtectedPage>} />
+        <Route path="/grades/:id/edit" element={<ProtectedPage allowedRoles={ACADEMIC_ROLES}><ResourceFormPage resource="grades" /></ProtectedPage>} />
+        <Route path="/grades/:id" element={<ProtectedPage><ResourceDetailPage resource="grades" /></ProtectedPage>} />
+        <Route path="/profile" element={<ProtectedPage><ProfilePage /></ProtectedPage>} />
+        <Route path="*" element={<NotFoundPage />} />
+      </Routes>
+      {backgroundLocation && (
+        <Routes location={location}>
+          <Route path="/students/new" element={<ModalRoute><ProtectedScreen allowedRoles={MANAGEMENT_ROLES}><ResourceFormPage resource="students" /></ProtectedScreen></ModalRoute>} />
+          <Route path="/students/:id/edit" element={<ModalRoute><ProtectedScreen allowedRoles={MANAGEMENT_ROLES}><ResourceFormPage resource="students" /></ProtectedScreen></ModalRoute>} />
+          <Route path="/students/:id/academic-record" element={<ModalRoute><ProtectedScreen allowedRoles={[...MANAGEMENT_ROLES, 'student']}><StudentAcademicRecordPage /></ProtectedScreen></ModalRoute>} />
+          <Route path="/students/:id" element={<ModalRoute><ProtectedScreen allowedRoles={[...MANAGEMENT_ROLES, 'student']}><ResourceDetailPage resource="students" /></ProtectedScreen></ModalRoute>} />
+          <Route path="/programs/new" element={<ModalRoute><ProtectedScreen allowedRoles={MANAGEMENT_ROLES}><ResourceFormPage resource="programs" /></ProtectedScreen></ModalRoute>} />
+          <Route path="/programs/:id/edit" element={<ModalRoute><ProtectedScreen allowedRoles={MANAGEMENT_ROLES}><ResourceFormPage resource="programs" /></ProtectedScreen></ModalRoute>} />
+          <Route path="/programs/:id" element={<ModalRoute><ProtectedScreen allowedRoles={MANAGEMENT_ROLES}><ResourceDetailPage resource="programs" /></ProtectedScreen></ModalRoute>} />
+          <Route path="/courses/new" element={<ModalRoute><ProtectedScreen allowedRoles={MANAGEMENT_ROLES}><ResourceFormPage resource="courses" /></ProtectedScreen></ModalRoute>} />
+          <Route path="/courses/:id/edit" element={<ModalRoute><ProtectedScreen allowedRoles={MANAGEMENT_ROLES}><ResourceFormPage resource="courses" /></ProtectedScreen></ModalRoute>} />
+          <Route path="/courses/:id" element={<ModalRoute><ProtectedScreen allowedRoles={MANAGEMENT_ROLES}><ResourceDetailPage resource="courses" /></ProtectedScreen></ModalRoute>} />
+          <Route path="/academic-terms/new" element={<ModalRoute><ProtectedScreen allowedRoles={MANAGEMENT_ROLES}><ResourceFormPage resource="academic-terms" /></ProtectedScreen></ModalRoute>} />
+          <Route path="/academic-terms/:id/edit" element={<ModalRoute><ProtectedScreen allowedRoles={MANAGEMENT_ROLES}><ResourceFormPage resource="academic-terms" /></ProtectedScreen></ModalRoute>} />
+          <Route path="/academic-terms/:id" element={<ModalRoute><ProtectedScreen allowedRoles={MANAGEMENT_ROLES}><ResourceDetailPage resource="academic-terms" /></ProtectedScreen></ModalRoute>} />
+          <Route path="/course-offerings/new" element={<ModalRoute><ProtectedScreen allowedRoles={MANAGEMENT_ROLES}><ResourceFormPage resource="course-offerings" /></ProtectedScreen></ModalRoute>} />
+          <Route path="/course-offerings/:id/edit" element={<ModalRoute><ProtectedScreen allowedRoles={MANAGEMENT_ROLES}><ResourceFormPage resource="course-offerings" /></ProtectedScreen></ModalRoute>} />
+          <Route path="/course-offerings/:id/roster" element={<ModalRoute><ProtectedScreen allowedRoles={ACADEMIC_ROLES}><CourseOfferingRosterPage /></ProtectedScreen></ModalRoute>} />
+          <Route path="/course-offerings/:id" element={<ModalRoute><ProtectedScreen allowedRoles={ACADEMIC_ROLES}><ResourceDetailPage resource="course-offerings" /></ProtectedScreen></ModalRoute>} />
+          <Route path="/enrollments/new" element={<ModalRoute><ProtectedScreen allowedRoles={MANAGEMENT_ROLES}><ResourceFormPage resource="enrollments" /></ProtectedScreen></ModalRoute>} />
+          <Route path="/enrollments/:id/edit" element={<ModalRoute><ProtectedScreen allowedRoles={MANAGEMENT_ROLES}><ResourceFormPage resource="enrollments" /></ProtectedScreen></ModalRoute>} />
+          <Route path="/enrollments/:id" element={<ModalRoute><ProtectedScreen><ResourceDetailPage resource="enrollments" /></ProtectedScreen></ModalRoute>} />
+          <Route path="/grades/new" element={<ModalRoute><ProtectedScreen allowedRoles={ACADEMIC_ROLES}><ResourceFormPage resource="grades" /></ProtectedScreen></ModalRoute>} />
+          <Route path="/grades/:id/edit" element={<ModalRoute><ProtectedScreen allowedRoles={ACADEMIC_ROLES}><ResourceFormPage resource="grades" /></ProtectedScreen></ModalRoute>} />
+          <Route path="/grades/:id" element={<ModalRoute><ProtectedScreen><ResourceDetailPage resource="grades" /></ProtectedScreen></ModalRoute>} />
+        </Routes>
+      )}
+    </>
   );
 }
 

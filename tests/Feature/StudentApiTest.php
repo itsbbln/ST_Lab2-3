@@ -10,6 +10,7 @@ use App\Models\Course;
 use App\Models\CourseOffering;
 use App\Models\Enrollment;
 use App\Models\Grade;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -69,6 +70,29 @@ class StudentApiTest extends TestCase
             'program_id' => $program->id,
             'year_level' => 1,
         ])->assertStatus(422)->assertJsonPath('success', false)->assertJsonStructure(['errors' => ['student_number']]);
+    }
+
+    public function test_year_level_supports_program_extensions_but_cannot_exceed_six(): void
+    {
+        $admin = User::factory()->create(['role' => 'administrator', 'status' => 'active']);
+        $program = Program::create(['code' => 'BSIT', 'name' => 'Information Technology']);
+        Sanctum::actingAs($admin);
+
+        $this->postJson('/api/v1/students', [
+        'student_number' => '2026-EXT-06',
+        'first_name' => 'Extended',
+        'last_name' => 'Student',
+        'program_id' => $program->id,
+        'year_level' => 6,
+        ])->assertCreated()->assertJsonPath('data.year_level', 6);
+
+        $this->postJson('/api/v1/students', [
+        'student_number' => '2026-EXT-07',
+        'first_name' => 'Invalid',
+        'last_name' => 'Student',
+        'program_id' => $program->id,
+        'year_level' => 7,
+        ])->assertUnprocessable()->assertJsonStructure(['errors' => ['year_level']]);
     }
 
     public function test_student_role_cannot_create_programs(): void
@@ -184,6 +208,28 @@ class StudentApiTest extends TestCase
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.course_code', 'IT201')
             ->assertJsonPath('meta.per_page', 1);
+    }
+
+    public function test_recently_updated_students_are_returned_first(): void
+    {
+        $admin = User::factory()->create(['role' => 'administrator', 'status' => 'active']);
+        $program = Program::create(['code' => 'BSIT', 'name' => 'Information Technology']);
+        Carbon::setTestNow('2026-06-01 10:00:00');
+        $olderStudent = $this->createStudent($program, '2026-00001', 'Ada', 'Lovelace');
+        $newerStudent = $this->createStudent($program, '2026-00002', 'Grace', 'Hopper');
+        Sanctum::actingAs($admin);
+
+        try {
+            Carbon::setTestNow('2026-06-01 10:01:00');
+            $this->patchJson('/api/v1/students/'.$olderStudent->id, ['first_name' => 'Augusta'])->assertOk();
+
+            $this->getJson('/api/v1/students?sort=-updated_at')
+                ->assertOk()
+                ->assertJsonPath('data.0.id', $olderStudent->id)
+                ->assertJsonPath('data.1.id', $newerStudent->id);
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 
     public function test_enrollment_duplicate_and_grade_range_are_enforced_by_api(): void

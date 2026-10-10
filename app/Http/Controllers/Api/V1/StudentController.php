@@ -36,12 +36,14 @@ class StudentController extends Controller
         $query->when($request->filled('year_level'), fn ($builder) => $builder->where('year_level', $request->integer('year_level')));
         $query->when($request->filled('status'), fn ($builder) => $builder->where('status', $request->string('status')->toString()));
 
-        $sort = $request->string('sort', 'last_name')->toString();
+        $sort = $request->string('sort', '-updated_at')->toString();
         $direction = str_starts_with($sort, '-') ? 'desc' : 'asc';
         $sort = ltrim($sort, '-');
-        abort_unless(in_array($sort, ['student_number', 'first_name', 'last_name', 'year_level', 'created_at'], true), 422, 'Invalid sort field.');
+        abort_unless(in_array($sort, ['student_number', 'first_name', 'last_name', 'year_level', 'created_at', 'updated_at'], true), 422, 'Invalid sort field.');
 
-        $students = $query->orderBy($sort, $direction)->paginate(min(max($request->integer('per_page', 20), 1), 100));
+        $students = $query->orderBy($sort, $direction)
+            ->when($sort === 'updated_at' && $direction === 'desc', fn ($builder) => $builder->orderByDesc('id'))
+            ->paginate(min(max($request->integer('per_page', 20), 1), 100));
 
         return response()->json([
             'success' => true,
@@ -95,7 +97,7 @@ class StudentController extends Controller
             'contact_number' => ['nullable', 'string', 'max:30'],
             'address' => ['nullable', 'string'],
             'program_id' => [$partial ? 'sometimes' : 'required', 'integer', 'exists:programs,id'],
-            'year_level' => [$partial ? 'sometimes' : 'required', 'integer', 'between:1,8'],
+            'year_level' => [$partial ? 'sometimes' : 'required', 'integer', 'between:1,6'],
             'status' => ['sometimes', Rule::in(['active', 'inactive', 'graduated'])],
         ];
     }

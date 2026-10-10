@@ -204,7 +204,7 @@ components:
     Search: { name: search, in: query, schema: { type: string } }
     Page: { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
     PerPage: { name: per_page, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
-    Sort: { name: sort, in: query, schema: { type: string, example: last_name } }
+    Sort: { name: sort, in: query, description: "Prefix with - for descending order. Defaults to -updated_at on resource collections.", schema: { type: string, example: -updated_at } }
   schemas:
     LoginRequest:
       type: object
@@ -236,7 +236,19 @@ components:
     StudentRequest:
       type: object
       required: [student_number, first_name, last_name, program_id, year_level]
-      properties: { student_number: { type: string }, first_name: { type: string }, middle_name: { type: string, nullable: true }, last_name: { type: string }, email: { type: string, format: email, nullable: true }, program_id: { type: integer }, year_level: { type: integer, minimum: 1, maximum: 8 }, status: { type: string, enum: [active, inactive, graduated] } }
+      properties:
+        student_number: { type: string }
+        first_name: { type: string }
+        middle_name: { type: string, nullable: true }
+        last_name: { type: string }
+        suffix: { type: string, nullable: true }
+        birth_date: { type: string, format: date, nullable: true }
+        email: { type: string, format: email, nullable: true }
+        contact_number: { type: string, nullable: true }
+        address: { type: string, nullable: true }
+        program_id: { type: integer }
+        year_level: { type: integer, minimum: 1, maximum: 6, description: "Program length varies; approved extensions may reach year 6." }
+        status: { type: string, enum: [active, inactive, graduated] }
     CourseRequest:
       type: object
       required: [course_code, course_title, units]
@@ -246,7 +258,19 @@ components:
       properties: { code: { type: string, maxLength: 30 }, name: { type: string }, description: { type: string, nullable: true }, status: { type: string, enum: [active, inactive] } }
     StudentUpdate:
       type: object
-      properties: { student_number: { type: string }, first_name: { type: string }, middle_name: { type: string, nullable: true }, last_name: { type: string }, email: { type: string, format: email, nullable: true }, program_id: { type: integer }, year_level: { type: integer, minimum: 1, maximum: 8 }, status: { type: string, enum: [active, inactive, graduated] } }
+      properties:
+        student_number: { type: string }
+        first_name: { type: string }
+        middle_name: { type: string, nullable: true }
+        last_name: { type: string }
+        suffix: { type: string, nullable: true }
+        birth_date: { type: string, format: date, nullable: true }
+        email: { type: string, format: email, nullable: true }
+        contact_number: { type: string, nullable: true }
+        address: { type: string, nullable: true }
+        program_id: { type: integer }
+        year_level: { type: integer, minimum: 1, maximum: 6, description: "Program length varies; approved extensions may reach year 6." }
+        status: { type: string, enum: [active, inactive, graduated] }
     CourseUpdate:
       type: object
       properties: { course_code: { type: string }, course_title: { type: string }, units: { type: integer, minimum: 1, maximum: 12 }, description: { type: string, nullable: true }, status: { type: string, enum: [active, inactive] } }

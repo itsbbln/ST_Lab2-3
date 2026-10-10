@@ -25,12 +25,14 @@ class ProgramController extends Controller
             $query->where('status', $request->string('status')->toString());
         }
 
-        $sort = $request->string('sort', 'name')->toString();
+        $sort = $request->string('sort', '-updated_at')->toString();
         $direction = str_starts_with($sort, '-') ? 'desc' : 'asc';
         $sort = ltrim($sort, '-');
-        abort_unless(in_array($sort, ['code', 'name', 'status', 'created_at'], true), 422, 'Invalid sort field.');
+        abort_unless(in_array($sort, ['code', 'name', 'status', 'created_at', 'updated_at'], true), 422, 'Invalid sort field.');
 
-        $programs = $query->orderBy($sort, $direction)->paginate(min(max($request->integer('per_page', 20), 1), 100));
+        $programs = $query->orderBy($sort, $direction)
+            ->when($sort === 'updated_at' && $direction === 'desc', fn ($builder) => $builder->orderByDesc('id'))
+            ->paginate(min(max($request->integer('per_page', 20), 1), 100));
 
         return response()->json([
             'success' => true,

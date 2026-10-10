@@ -17,7 +17,7 @@ class UserController extends Controller
             'search' => ['sometimes', 'string', 'max:255'],
             'role' => ['sometimes', Rule::in(Roles::ALL)],
             'status' => ['sometimes', Rule::in(['active', 'inactive'])],
-            'sort' => ['sometimes', 'regex:/^-?(name|email|role|status|created_at)$/'],
+            'sort' => ['sometimes', 'regex:/^-?(name|email|role|status|created_at|updated_at)$/'],
             'page' => ['sometimes', 'integer', 'min:1'],
             'per_page' => ['sometimes', 'integer', 'between:1,100'],
         ]);
@@ -43,10 +43,12 @@ class UserController extends Controller
         $query->when($request->filled('role'), fn ($builder) => $builder->where('role', $request->string('role')->toString()));
         $query->when($request->filled('status'), fn ($builder) => $builder->where('status', $request->string('status')->toString()));
 
-        $sort = $request->string('sort', 'name')->toString();
+        $sort = $request->string('sort', '-updated_at')->toString();
         $direction = str_starts_with($sort, '-') ? 'desc' : 'asc';
         $sort = ltrim($sort, '-');
-        $users = $query->orderBy($sort, $direction)->paginate($request->integer('per_page', 20));
+        $users = $query->orderBy($sort, $direction)
+            ->when($sort === 'updated_at' && $direction === 'desc', fn ($builder) => $builder->orderByDesc('id'))
+            ->paginate($request->integer('per_page', 20));
 
         return response()->json([
             'success' => true,

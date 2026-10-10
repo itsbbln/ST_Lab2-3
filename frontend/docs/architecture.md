@@ -12,7 +12,7 @@ The React/Vite application in `frontend/` is a separate client for the Laravel R
 
 ## Routes, Screens, and Data
 
-`src/App.jsx` contains the route definitions and feature screens. `src/components/ProtectedRoute.jsx` handles unauthenticated navigation and role-based access-denied views. The dashboard, students, programs, courses, academic terms, offerings, enrollments, grades, and academic-record screens call the existing versioned API. Per-screen React state holds fetched data, filters, pagination, and form input; successful writes refresh the relevant API-backed list.
+`src/App.jsx` contains the list screens and role-protected route definitions. `src/ResourcePages.jsx` provides shared create/edit forms and record-detail screens, plus academic-record and course-roster views. In-app actions open these workflows in a modal dialog above the current list with a dimmed, blurred backdrop, keeping the list in place. Each workflow fetches its data from the API instead of relying on transient state, so direct links and browser refreshes still work as standalone pages. List screens retain filters, sorting, and pagination; successful writes return to the refreshed resource list.
 
 Role-aware navigation improves usability, but it is not a security boundary. Laravel Sanctum, role middleware, policies, and scoped queries enforce access on the server, including object-level restrictions for students and instructors.
 
